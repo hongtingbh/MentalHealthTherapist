@@ -10,8 +10,6 @@ import {
   Wind,
 } from "lucide-react";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,17 +26,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 import { getJournalEntries } from "@/lib/actions";
 import { Mood, MoodDataItem } from "@/lib/definitions";
 import { formatDistanceToNow } from "date-fns";
+import { MoodChart } from "@/components/dashboard/mood-chart";
 
 const MOOD_ICONS: Record<Mood, React.ReactNode> = {
   Happy: <Smile className="h-5 w-5 text-green-500" />,
@@ -198,32 +189,7 @@ export default async function Dashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={moodData}>
-                  <XAxis
-                    dataKey="mood"
-                    stroke="#888888"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="#888888"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `${value}`}
-                  />
-                  <Tooltip
-                    cursor={{ fill: 'hsl(var(--accent) / 0.2)' }}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--background))',
-                      borderColor: 'hsl(var(--border))',
-                    }}
-                  />
-                  <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <MoodChart moodData={moodData} />
             </CardContent>
           </Card>
         </div>
