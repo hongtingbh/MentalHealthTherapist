@@ -23,7 +23,7 @@ export default function AppLayout({
           <SidebarHeader>
             <div className="flex items-center gap-2">
               <AppLogo className="w-8 h-8 text-primary" />
-              <span className="text-lg font-semibold font-headline">Mindful Journey</span>
+              <span className="text-lg font-semibold font-headline">Mental Health App</span>
             </div>
           </SidebarHeader>
           <SidebarContent>

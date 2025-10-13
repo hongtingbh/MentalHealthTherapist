@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'Mindful Journey',
+  title: 'Mental Health App',
   description: 'Your companion for mental wellness and self-discovery.',
 };
 
