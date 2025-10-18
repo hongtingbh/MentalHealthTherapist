@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { app } from '@/lib/firebase';
+import { initializeFirebase } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 
 export function LoginForm() {
@@ -16,9 +16,10 @@ export function LoginForm() {
   const { toast } = useToast();
 
   const handleGoogleLogin = async () => {
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
     try {
+      const app = initializeFirebase();
+      const auth = getAuth(app);
+      const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
       router.push('/dashboard');
     } catch (error) {
