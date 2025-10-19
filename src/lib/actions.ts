@@ -6,16 +6,18 @@ import { summarizeJournalEntry } from '@/ai/flows/summarize-journal-entry';
 import { detectSelfHarm } from '@/ai/flows/detect-potential-self-harm';
 import { classifyMoodDisorders } from '@/ai/flows/classify-mood-disorders';
 import { JournalEntry, Mood } from './definitions';
-
-// This is a mock database. In a real application, you would use a database
-// like Firestore, PostgreSQL, etc.
-const journalEntries: JournalEntry[] = [];
-let journalIdCounter = 1;
+import { initializeFirebase } from './firebase';
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from 'firebase/firestore';
 
 const NewEntrySchema = z.object({
   content: z.string().min(1, 'Journal entry cannot be empty.'),
   mood: z.enum(['Happy', 'Calm', 'Neutral', 'Sad', 'Anxious']),
 });
+
+async function getDb() {
+  const app = initializeFirebase();
+  return getFirestore(app);
+}
 
 export async function createJournalEntry(prevState: any, formData: FormData) {
   const validatedFields = NewEntrySchema.safeParse({
@@ -34,29 +36,52 @@ export async function createJournalEntry(prevState: any, formData: FormData) {
 
   try {
     const { summary } = await summarizeJournalEntry({ journalEntry: content });
-
-    const newEntry: JournalEntry = {
-      id: (journalIdCounter++).toString(),
-      createdAt: new Date().toISOString(),
-      mood: mood as Mood,
-      content,
-      summary,
-    };
-
-    journalEntries.unshift(newEntry); // Add to the beginning of the array
+    const db = await getDb();
+    
+    await addDoc(collection(db, "journalEntries"), {
+        createdAt: serverTimestamp(),
+        mood: mood as Mood,
+        content,
+        summary,
+    });
 
     revalidatePath('/journal');
     revalidatePath('/dashboard');
     return { message: 'Journal entry created successfully.', success: true };
   } catch (error) {
     console.error('Error creating journal entry:', error);
-    return { message: 'Error processing AI summary. Please try again.' };
+    return { message: 'Error saving to database. Please try again.' };
   }
 }
 
-export async function getJournalEntries() {
-  // In a real app, you'd fetch this from a database
-  return Promise.resolve(journalEntries);
+export async function getJournalEntries(): Promise<JournalEntry[]> {
+  try {
+    const db = await getDb();
+    const entriesCollection = collection(db, "journalEntries");
+    const q = query(entriesCollection, orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+        return [];
+    }
+
+    const entries = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        content: data.content,
+        mood: data.mood,
+        summary: data.summary,
+        // Firestore Timestamps need to be converted to serializable format
+        createdAt: data.createdAt.toDate().toISOString(),
+      };
+    });
+
+    return entries as JournalEntry[];
+  } catch (error) {
+    console.error("Error fetching journal entries: ", error);
+    return [];
+  }
 }
 
 export async function postChatMessage(message: string, mediaDataUri?: string) {
