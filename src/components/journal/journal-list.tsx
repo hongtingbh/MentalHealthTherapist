@@ -16,24 +16,21 @@ const MOOD_DETAILS: Record<Mood, { icon: React.ReactNode; color: string }> = {
 
 function JournalCard({ entry }: { entry: JournalEntry }) {
   const moodDetail = MOOD_DETAILS[entry.mood];
-  const createdAt = entry.createdAt ? new Date(entry.createdAt) : new Date();
+  const createdAt = entry.createdAt?.seconds ? new Date(entry.createdAt.seconds * 1000) : new Date();
   
   return (
-    <Card className="hover:shadow-md transition-shadow duration-300">
+    <Card className="hover:shadow-md transition-shadow duration-300 flex flex-col">
       <CardHeader>
         <div className="flex justify-between items-start">
-          <div>
-            <CardTitle className="font-headline text-xl">{entry.summary}</CardTitle>
             <CardDescription>{format(createdAt, "MMMM d, yyyy 'at' h:mm a")}</CardDescription>
-          </div>
           <Badge variant="outline" className={`flex items-center gap-2 ${moodDetail.color}`}>
             {moodDetail.icon}
             {entry.mood}
           </Badge>
         </div>
       </CardHeader>
-      <CardContent>
-        <p className="text-muted-foreground line-clamp-3">{entry.content}</p>
+      <CardContent className="flex-grow">
+        <p className="text-muted-foreground line-clamp-4">{entry.content}</p>
       </CardContent>
       <CardFooter>
         {/* Can add actions here in the future */}
@@ -49,8 +46,7 @@ export function JournalList({ initialEntries, isLoading }: { initialEntries: Jou
             {Array.from({ length: 3 }).map((_, i) => (
                 <Card key={i}>
                     <CardHeader>
-                        <Skeleton className="h-6 w-3/4" />
-                        <Skeleton className="h-4 w-1/2 mt-2" />
+                        <Skeleton className="h-4 w-1/2" />
                     </CardHeader>
                     <CardContent>
                         <Skeleton className="h-4 w-full" />

@@ -151,7 +151,7 @@ export default function Dashboard() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Mood</TableHead>
-                    <TableHead>Summary</TableHead>
+                    <TableHead>Entry</TableHead>
                     <TableHead className="hidden md:table-cell text-right">
                       Date
                     </TableHead>
@@ -167,7 +167,7 @@ export default function Dashboard() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="font-medium">{entry.summary}</div>
+                          <div className="font-medium line-clamp-1">{entry.content}</div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-right">
                           {entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt.seconds * 1000), {

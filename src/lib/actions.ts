@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { summarizeJournalEntry } from '@/ai/flows/summarize-journal-entry';
 import { detectSelfHarm } from '@/ai/flows/detect-potential-self-harm';
 import { classifyMoodDisorders } from '@/ai/flows/classify-mood-disorders';
 import { JournalEntry, Mood } from './definitions';
@@ -41,14 +40,12 @@ export async function createJournalEntry(prevState: any, formData: FormData) {
   const { content, mood, userId } = validatedFields.data;
 
   try {
-    const { summary } = await summarizeJournalEntry({ journalEntry: content });
     const db = getDb();
     
     await addDoc(collection(db, "users", userId, "journalEntries"), {
         createdAt: serverTimestamp(),
         mood: mood as Mood,
         content,
-        summary,
         userId,
     });
 
@@ -80,7 +77,7 @@ export async function getJournalEntries(userId: string): Promise<JournalEntry[]>
         id: doc.id,
         content: data.content,
         mood: data.mood,
-        summary: data.summary || "No summary available.",
+        summary: data.content.substring(0, 100), // Use a snippet of content as summary
         createdAt: data.createdAt ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
         userId: data.userId,
       };

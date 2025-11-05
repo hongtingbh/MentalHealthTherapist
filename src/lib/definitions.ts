@@ -10,10 +10,10 @@ export type Mood = (typeof MOODS)[number];
 
 export type JournalEntry = {
   id: string;
-  createdAt: string;
+  createdAt: any; // Allow serverTimestamp
   mood: Mood;
   content: string;
-  summary: string;
+  summary?: string; // Make summary optional
   userId: string;
 };
 
