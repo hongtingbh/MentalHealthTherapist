@@ -71,9 +71,10 @@ export async function getJournalEntries(): Promise<JournalEntry[]> {
         id: doc.id,
         content: data.content,
         mood: data.mood,
-        summary: data.summary,
+        summary: data.summary || "No summary available.",
         // Firestore Timestamps need to be converted to serializable format
-        createdAt: data.createdAt.toDate().toISOString(),
+        // and we need to check if it exists first
+        createdAt: data.createdAt ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
       };
     });
 
