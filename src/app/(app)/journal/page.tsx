@@ -1,7 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useCollection, useUser, useFirestore } from '@/firebase';
+import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { JournalList } from "@/components/journal/journal-list";
 import { NewJournalEntry } from "@/components/journal/new-journal-entry";
@@ -10,7 +9,7 @@ export default function JournalPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
 
-  const journalEntriesCollection = useMemo(() => {
+  const journalEntriesCollection = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return collection(firestore, 'users', user.uid, 'journalEntries');
   }, [user, firestore]);

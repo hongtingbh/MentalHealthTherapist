@@ -1,5 +1,6 @@
 'use client';
 import Link from "next/link";
+import { useMemo } from "react";
 import {
   Activity,
   ArrowUpRight,
@@ -59,11 +60,13 @@ export default function Dashboard() {
   const { data: allEntries } = useCollection<JournalEntryType>(journalEntriesQuery);
   const { data: recentEntries } = useCollection<JournalEntryType>(recentEntriesQuery);
 
-  const moodData: MoodDataItem[] = useMemoFirebase(() => {
+  const moodData: MoodDataItem[] = useMemo(() => {
     const moodCounts: Record<Mood, number> = { Happy: 0, Calm: 0, Neutral: 0, Sad: 0, Anxious: 0 };
     if (allEntries) {
       allEntries.forEach((entry) => {
-        moodCounts[entry.mood]++;
+        if (entry.mood && moodCounts[entry.mood] !== undefined) {
+          moodCounts[entry.mood]++;
+        }
       });
     }
     return Object.entries(moodCounts).map(([mood, count]) => ({ mood: mood as Mood, count }));
@@ -160,14 +163,14 @@ export default function Dashboard() {
                       <TableRow key={entry.id}>
                         <TableCell>
                           <div className="font-medium">
-                            {MOOD_ICONS[entry.mood]}
+                            {entry.mood ? MOOD_ICONS[entry.mood] : null}
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="font-medium">{entry.summary}</div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-right">
-                          {entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt), {
+                          {entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt.seconds * 1000), {
                             addSuffix: true,
                           }) : 'Just now'}
                         </TableCell>
