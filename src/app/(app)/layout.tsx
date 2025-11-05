@@ -1,3 +1,4 @@
+'use client';
 import {
   SidebarProvider,
   Sidebar,
@@ -10,12 +11,23 @@ import { AppLogo } from '@/components/icons';
 import { MainNav } from '@/components/dashboard/main-nav';
 import { UserNav } from '@/components/dashboard/user-nav';
 import { Separator } from '@/components/ui/separator';
+import { useState, useEffect } from 'react';
 
 export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null; // Or a loading spinner
+  }
+  
   return (
     <SidebarProvider>
       <div className="flex min-h-screen">

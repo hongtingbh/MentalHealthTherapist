@@ -1,11 +1,23 @@
+'use client';
 import { LoginForm } from '@/components/login/login-form';
 import { AppLogo } from '@/components/icons';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Image from 'next/image';
+import { useState, useEffect } from 'react';
 
 const loginBg = PlaceHolderImages.find(p => p.id === 'login-background');
 
 export default function LoginPage() {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null; // Or a loading spinner
+  }
+
   return (
     <div className="w-full lg:grid lg:min-h-[100vh] lg:grid-cols-2 xl:min-h-[100vh]">
       <div className="flex items-center justify-center py-12">
