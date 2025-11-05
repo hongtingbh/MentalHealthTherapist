@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useState, useTransition, useEffect, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -57,7 +57,7 @@ export function NewJournalEntry() {
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
   const { user } = useUser();
 
-  const [state, formAction] = useFormState(createJournalEntry, { message: '', errors: {} });
+  const [state, formAction] = useActionState(createJournalEntry, { message: '', errors: {} });
 
   const form = useForm<NewEntryFormState>({
     resolver: zodResolver(NewEntrySchema),
