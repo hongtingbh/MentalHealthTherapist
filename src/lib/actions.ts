@@ -4,12 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { detectSelfHarm } from '@/ai/flows/detect-potential-self-harm';
 import { classifyMoodDisorders } from '@/ai/flows/classify-mood-disorders';
-import { JournalEntry, Mood } from './definitions';
-import { getSdks } from '@/firebase';
-import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, where } from 'firebase/firestore';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { firebaseConfig } from '@/firebase/config';
-import { getAuth } from 'firebase/auth';
+import { JournalEntry, Mood, ChatMessage } from './definitions';
+import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { initializeApp, getApps, App, cert } from 'firebase-admin/app';
 
 const NewEntrySchema = z.object({
   content: z.string().min(1, 'Journal entry cannot be empty.'),
@@ -17,11 +14,29 @@ const NewEntrySchema = z.object({
   userId: z.string().min(1, "User ID is required."),
 });
 
-function getDb() {
-  const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-  const { firestore } = getSdks(app);
-  return firestore;
+
+// Helper function to initialize Firebase Admin SDK
+function getAdminApp() {
+  if (getApps().length > 0) {
+    return getApps()[0];
+  }
+  
+  // This environment variable is set by Firebase App Hosting.
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
+    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+    : undefined;
+
+  if (serviceAccount) {
+    return initializeApp({
+        credential: cert(serviceAccount)
+    });
+  }
+
+  // Fallback for local development if the service account isn't set.
+  // Note: This requires the GOOGLE_APPLICATION_CREDENTIALS env var to be set.
+  return initializeApp();
 }
+
 
 export async function createJournalEntry(prevState: any, formData: FormData) {
   const validatedFields = NewEntrySchema.safeParse({
@@ -40,10 +55,11 @@ export async function createJournalEntry(prevState: any, formData: FormData) {
   const { content, mood, userId } = validatedFields.data;
 
   try {
-    const db = getDb();
+    const adminApp = getAdminApp();
+    const db = getFirestore(adminApp);
     
-    await addDoc(collection(db, "users", userId, "journalEntries"), {
-        createdAt: serverTimestamp(),
+    await db.collection("users").doc(userId).collection("journalEntries").add({
+        createdAt: FieldValue.serverTimestamp(),
         mood: mood as Mood,
         content,
         userId,
@@ -59,54 +75,46 @@ export async function createJournalEntry(prevState: any, formData: FormData) {
   }
 }
 
-export async function getJournalEntries(userId: string): Promise<JournalEntry[]> {
-  if (!userId) return [];
+export async function postChatMessage(userId: string, message: string, mediaDataUri?: string): Promise<ChatMessage> {
   try {
-    const db = getDb();
-    const entriesCollection = collection(db, "users", userId, "journalEntries");
-    const q = query(entriesCollection, orderBy("createdAt", "desc"));
-    const snapshot = await getDocs(q);
-    
-    if (snapshot.empty) {
-        return [];
-    }
+    const adminApp = getAdminApp();
+    const db = getFirestore(adminApp);
 
-    const entries = snapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        content: data.content,
-        mood: data.mood,
-        summary: data.content.substring(0, 100), // Use a snippet of content as summary
-        createdAt: data.createdAt ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
-        userId: data.userId,
-      };
+    // 1. Save user message to Firestore
+    const userMessage: Omit<ChatMessage, 'id' | 'classification' | 'selfHarmWarning'> = {
+      role: 'user',
+      text: message,
+      ...(mediaDataUri && { mediaUrl: mediaDataUri }),
+    };
+    await db.collection('users').doc(userId).collection('chatMessages').add({
+      ...userMessage,
+      timestamp: FieldValue.serverTimestamp(),
+      userId,
     });
 
-    return entries as JournalEntry[];
-  } catch (error) {
-    console.error("Error fetching journal entries: ", error);
-    return [];
-  }
-}
 
-export async function postChatMessage(message: string, mediaDataUri?: string) {
-  try {
-    // 1. Check for self-harm
+    // 2. Check for self-harm
     const selfHarmCheck = await detectSelfHarm({ text: message });
     if (selfHarmCheck.selfHarmDetected) {
-      return {
+      const assistantMessage: ChatMessage = {
         role: 'assistant' as const,
         id: new Date().toISOString(),
         selfHarmWarning: selfHarmCheck.guidance,
         text: 'It sounds like you are going through a difficult time. Please consider reaching out for professional help.',
       };
+      // Save assistant's warning message
+      await db.collection('users').doc(userId).collection('chatMessages').add({
+        ...assistantMessage,
+        timestamp: FieldValue.serverTimestamp(),
+        userId,
+      });
+      return assistantMessage;
     }
 
-    // 2. Classify mood disorders
+    // 3. Classify mood disorders
     const classification = await classifyMoodDisorders({ message, mediaDataUri });
 
-    return {
+     const assistantResponse: ChatMessage = {
       role: 'assistant' as const,
       id: new Date().toISOString(),
       text: classification.summary,
@@ -117,6 +125,18 @@ export async function postChatMessage(message: string, mediaDataUri?: string) {
         summary: classification.summary,
       },
     };
+
+    // Save assistant's response
+    await db.collection('users').doc(userId).collection('chatMessages').add({
+        text: assistantResponse.text,
+        role: 'assistant',
+        classification: assistantResponse.classification,
+        timestamp: FieldValue.serverTimestamp(),
+        userId,
+    });
+
+    return assistantResponse;
+
   } catch (error) {
     console.error('Error processing chat message:', error);
     return {

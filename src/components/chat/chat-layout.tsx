@@ -22,6 +22,8 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import Image from 'next/image';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
 
 const userAvatar = PlaceHolderImages.find((p) => p.id === 'user-avatar');
 
@@ -48,6 +50,26 @@ export function ChatLayout() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const messagesQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return query(
+      collection(firestore, 'users', user.uid, 'chatMessages'),
+      orderBy('timestamp', 'asc')
+    );
+  }, [user, firestore]);
+
+  const { data: initialMessages } = useCollection<ChatMessage>(messagesQuery);
+  
+  useEffect(() => {
+    if (initialMessages && initialMessages.length > 0) {
+      setMessages([assistantWelcomeMessage, ...initialMessages]);
+    } else {
+      setMessages([assistantWelcomeMessage]);
+    }
+  }, [initialMessages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -71,6 +93,10 @@ export function ChatLayout() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() && !file) return;
+    if (!user) {
+        toast({ title: "Not logged in", description: "You must be logged in to chat."});
+        return;
+    }
 
     const userMessage: ChatMessage = {
       id: new Date().toISOString(),
@@ -90,7 +116,7 @@ export function ChatLayout() {
 
 
     startTransition(async () => {
-      const assistantResponse = await postChatMessage(input, mediaDataUri);
+      const assistantResponse = await postChatMessage(user.uid, input, mediaDataUri);
       setMessages((prev) => [...prev, assistantResponse]);
     });
   };
@@ -149,7 +175,7 @@ export function ChatLayout() {
         </div>
         {!isAssistant && (
              <Avatar className="h-8 w-8">
-                <AvatarImage src={userAvatar?.imageUrl} />
+                <AvatarImage src={user?.photoURL || userAvatar?.imageUrl} />
                 <AvatarFallback>U</AvatarFallback>
             </Avatar>
         )}
@@ -160,8 +186,8 @@ export function ChatLayout() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {messages.map((msg) => (
-          <Message key={msg.id} msg={msg} />
+        {messages.map((msg, index) => (
+          <Message key={msg.id || index} msg={msg} />
         ))}
         {isPending && (
           <div className="flex items-start gap-4">

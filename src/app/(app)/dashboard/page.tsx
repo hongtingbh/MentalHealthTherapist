@@ -56,9 +56,15 @@ export default function Dashboard() {
     if (!journalEntriesQuery) return null;
     return query(journalEntriesQuery, limit(5));
   }, [journalEntriesQuery]);
+  
+  const chatMessagesQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return query(collection(firestore, 'users', user.uid, 'chatMessages'));
+  }, [user, firestore]);
 
   const { data: allEntries } = useCollection<JournalEntryType>(journalEntriesQuery);
   const { data: recentEntries } = useCollection<JournalEntryType>(recentEntriesQuery);
+  const { data: allMessages } = useCollection(chatMessagesQuery);
 
   const moodData: MoodDataItem[] = useMemo(() => {
     const moodCounts: Record<Mood, number> = { Happy: 0, Calm: 0, Neutral: 0, Sad: 0, Anxious: 0 };
@@ -99,7 +105,7 @@ export default function Dashboard() {
               <MessageSquare className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">{allMessages?.length || 0}</div>
               <p className="text-xs text-muted-foreground">
                 messages sent and received
               </p>
@@ -170,7 +176,7 @@ export default function Dashboard() {
                           <div className="font-medium line-clamp-1">{entry.content}</div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-right">
-                          {entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt.seconds * 1000), {
+                          {entry.createdAt?.seconds ? formatDistanceToNow(new Date(entry.createdAt.seconds * 1000), {
                             addSuffix: true,
                           }) : 'Just now'}
                         </TableCell>
