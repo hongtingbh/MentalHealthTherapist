@@ -9,6 +9,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { googleAI } from '@genkit-ai/google-genai';
 
 const ClassifyMoodDisordersInputSchema = z.object({
   message: z.string().describe('The text message from the user.'),
@@ -39,6 +40,7 @@ const prompt = ai.definePrompt({
   name: 'classifyMoodDisordersPrompt',
   input: {schema: ClassifyMoodDisordersInputSchema},
   output: {schema: ClassifyMoodDisordersOutputSchema},
+  model: googleAI.model('gemini-1.5-flash-latest'),
   prompt: `You are an AI assistant designed to identify potential symptoms of PTSD, GAD, and MMD from user messages, including text and multimedia content.
 
   Analyze the following user message and media (if available) to identify potential symptoms related to PTSD, GAD, and MMD. Provide a summary of the identified symptoms and potential mood disorders.

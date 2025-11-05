@@ -10,6 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { googleAI } from '@genkit-ai/google-genai';
 
 const DetectSelfHarmInputSchema = z.object({
   text: z.string().describe('The text to analyze for self-harm indicators.'),
@@ -32,6 +33,7 @@ const prompt = ai.definePrompt({
   name: 'detectSelfHarmPrompt',
   input: {schema: DetectSelfHarmInputSchema},
   output: {schema: DetectSelfHarmOutputSchema},
+  model: googleAI.model('gemini-1.5-flash-latest'),
   prompt: `You are a mental health expert. Analyze the following text for indicators of potential self-harm.
 
 Text: {{{text}}}

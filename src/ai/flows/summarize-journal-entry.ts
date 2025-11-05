@@ -10,6 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { googleAI } from '@genkit-ai/google-genai';
 
 const SummarizeJournalEntryInputSchema = z.object({
   journalEntry: z
@@ -33,6 +34,7 @@ const prompt = ai.definePrompt({
   name: 'summarizeJournalEntryPrompt',
   input: {schema: SummarizeJournalEntryInputSchema},
   output: {schema: SummarizeJournalEntryOutputSchema},
+  model: googleAI.model('gemini-1.5-flash-latest'),
   prompt: `Summarize the following journal entry in a concise and informative way:\n\n{{{journalEntry}}}`,
 });
 
