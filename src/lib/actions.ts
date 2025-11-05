@@ -6,23 +6,29 @@ import { summarizeJournalEntry } from '@/ai/flows/summarize-journal-entry';
 import { detectSelfHarm } from '@/ai/flows/detect-potential-self-harm';
 import { classifyMoodDisorders } from '@/ai/flows/classify-mood-disorders';
 import { JournalEntry, Mood } from './definitions';
-import { initializeFirebase } from './firebase';
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { getSdks } from '@/firebase';
+import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, where } from 'firebase/firestore';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { firebaseConfig } from '@/firebase/config';
+import { getAuth } from 'firebase/auth';
 
 const NewEntrySchema = z.object({
   content: z.string().min(1, 'Journal entry cannot be empty.'),
   mood: z.enum(['Happy', 'Calm', 'Neutral', 'Sad', 'Anxious']),
+  userId: z.string().min(1, "User ID is required."),
 });
 
-async function getDb() {
-  const app = initializeFirebase();
-  return getFirestore(app);
+function getDb() {
+  const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  const { firestore } = getSdks(app);
+  return firestore;
 }
 
 export async function createJournalEntry(prevState: any, formData: FormData) {
   const validatedFields = NewEntrySchema.safeParse({
     content: formData.get('content'),
     mood: formData.get('mood'),
+    userId: formData.get('userId'),
   });
 
   if (!validatedFields.success) {
@@ -32,17 +38,18 @@ export async function createJournalEntry(prevState: any, formData: FormData) {
     };
   }
   
-  const { content, mood } = validatedFields.data;
+  const { content, mood, userId } = validatedFields.data;
 
   try {
     const { summary } = await summarizeJournalEntry({ journalEntry: content });
-    const db = await getDb();
+    const db = getDb();
     
-    await addDoc(collection(db, "journalEntries"), {
+    await addDoc(collection(db, "users", userId, "journalEntries"), {
         createdAt: serverTimestamp(),
         mood: mood as Mood,
         content,
         summary,
+        userId,
     });
 
     revalidatePath('/journal');
@@ -50,14 +57,16 @@ export async function createJournalEntry(prevState: any, formData: FormData) {
     return { message: 'Journal entry created successfully.', success: true };
   } catch (error) {
     console.error('Error creating journal entry:', error);
-    return { message: 'Error saving to database. Please try again.' };
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+    return { message: `Error saving to database: ${errorMessage}` };
   }
 }
 
-export async function getJournalEntries(): Promise<JournalEntry[]> {
+export async function getJournalEntries(userId: string): Promise<JournalEntry[]> {
+  if (!userId) return [];
   try {
-    const db = await getDb();
-    const entriesCollection = collection(db, "journalEntries");
+    const db = getDb();
+    const entriesCollection = collection(db, "users", userId, "journalEntries");
     const q = query(entriesCollection, orderBy("createdAt", "desc"));
     const snapshot = await getDocs(q);
     
@@ -72,9 +81,8 @@ export async function getJournalEntries(): Promise<JournalEntry[]> {
         content: data.content,
         mood: data.mood,
         summary: data.summary || "No summary available.",
-        // Firestore Timestamps need to be converted to serializable format
-        // and we need to check if it exists first
         createdAt: data.createdAt ? data.createdAt.toDate().toISOString() : new Date().toISOString(),
+        userId: data.userId,
       };
     });
 

@@ -23,6 +23,7 @@ import { MOODS, Mood } from '@/lib/definitions';
 import { Smile, Frown, Meh, Wind, Activity, PlusCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useUser } from '@/firebase';
 
 const MOOD_ICONS: Record<Mood, React.ReactNode> = {
   Happy: <Smile className="h-6 w-6" />,
@@ -35,6 +36,7 @@ const MOOD_ICONS: Record<Mood, React.ReactNode> = {
 const NewEntrySchema = z.object({
   content: z.string().min(10, 'Your entry should be at least 10 characters long.'),
   mood: z.enum(MOODS, { required_error: 'Please select your mood.' }),
+  userId: z.string(),
 });
 
 type NewEntryFormState = z.infer<typeof NewEntrySchema>;
@@ -53,6 +55,7 @@ export function NewJournalEntry() {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
+  const { user } = useUser();
 
   const [state, formAction] = useFormState(createJournalEntry, { message: '', errors: {} });
 
@@ -61,8 +64,15 @@ export function NewJournalEntry() {
     defaultValues: {
       content: '',
       mood: undefined,
+      userId: '',
     },
   });
+  
+  useEffect(() => {
+    if (user) {
+        form.setValue('userId', user.uid);
+    }
+  }, [user, form]);
 
   useEffect(() => {
     if (state.success) {
@@ -71,7 +81,7 @@ export function NewJournalEntry() {
         description: state.message,
       });
       setOpen(false);
-      form.reset();
+      form.reset({ userId: user?.uid || '' });
       setSelectedMood(null);
     } else if (state.message && !state.success) {
       toast({
@@ -80,7 +90,7 @@ export function NewJournalEntry() {
         variant: "destructive",
       });
     }
-  }, [state, toast, form]);
+  }, [state, toast, form, user]);
 
   const onFormAction = (formData: FormData) => {
     formData.set('mood', selectedMood || '');
@@ -90,7 +100,7 @@ export function NewJournalEntry() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button>
+        <Button disabled={!user}>
           <PlusCircle className="mr-2 h-4 w-4" /> New Entry
         </Button>
       </SheetTrigger>
@@ -102,6 +112,7 @@ export function NewJournalEntry() {
           </SheetDescription>
         </SheetHeader>
         <form action={onFormAction} className="flex-1 flex flex-col gap-6 py-4">
+          <input type="hidden" name="userId" value={user?.uid || ''} />
           <div className="grid gap-2">
             <Label>How are you feeling right now?</Label>
             <div className="flex gap-2 flex-wrap">

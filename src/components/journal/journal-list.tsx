@@ -4,6 +4,7 @@ import { JournalEntry, Mood } from "@/lib/definitions";
 import { format } from 'date-fns';
 import { Smile, Frown, Meh, Wind, Activity } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "../ui/skeleton";
 
 const MOOD_DETAILS: Record<Mood, { icon: React.ReactNode; color: string }> = {
   Happy: { icon: <Smile className="h-5 w-5" />, color: "bg-green-500/20 text-green-700 border-green-300" },
@@ -15,13 +16,15 @@ const MOOD_DETAILS: Record<Mood, { icon: React.ReactNode; color: string }> = {
 
 function JournalCard({ entry }: { entry: JournalEntry }) {
   const moodDetail = MOOD_DETAILS[entry.mood];
+  const createdAt = entry.createdAt ? new Date(entry.createdAt) : new Date();
+  
   return (
     <Card className="hover:shadow-md transition-shadow duration-300">
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
             <CardTitle className="font-headline text-xl">{entry.summary}</CardTitle>
-            <CardDescription>{format(new Date(entry.createdAt), "MMMM d, yyyy 'at' h:mm a")}</CardDescription>
+            <CardDescription>{format(createdAt, "MMMM d, yyyy 'at' h:mm a")}</CardDescription>
           </div>
           <Badge variant="outline" className={`flex items-center gap-2 ${moodDetail.color}`}>
             {moodDetail.icon}
@@ -39,7 +42,27 @@ function JournalCard({ entry }: { entry: JournalEntry }) {
   );
 }
 
-export function JournalList({ initialEntries }: { initialEntries: JournalEntry[] }) {
+export function JournalList({ initialEntries, isLoading }: { initialEntries: JournalEntry[], isLoading: boolean }) {
+  if (isLoading) {
+    return (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i}>
+                    <CardHeader>
+                        <Skeleton className="h-6 w-3/4" />
+                        <Skeleton className="h-4 w-1/2 mt-2" />
+                    </CardHeader>
+                    <CardContent>
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-full mt-2" />
+                        <Skeleton className="h-4 w-2/3 mt-2" />
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
+    )
+  }
+  
   if (initialEntries.length === 0) {
     return (
       <div className="text-center py-20 border-2 border-dashed rounded-lg">

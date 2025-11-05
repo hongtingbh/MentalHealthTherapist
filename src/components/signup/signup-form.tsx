@@ -8,13 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { initializeFirebase } from '@/lib/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { useAuth } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
 export function SignupForm() {
   const router = useRouter();
+  const auth = useAuth();
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,8 +25,6 @@ export function SignupForm() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const app = initializeFirebase();
-      const auth = getAuth(app);
       await createUserWithEmailAndPassword(auth, email, password);
       toast({
         title: 'Account Created!',

@@ -1,9 +1,21 @@
-import { getJournalEntries } from "@/lib/actions";
+'use client';
+
+import { useMemo } from 'react';
+import { useCollection, useUser, useFirestore } from '@/firebase';
+import { collection } from 'firebase/firestore';
 import { JournalList } from "@/components/journal/journal-list";
 import { NewJournalEntry } from "@/components/journal/new-journal-entry";
 
-export default async function JournalPage() {
-  const initialEntries = await getJournalEntries();
+export default function JournalPage() {
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
+
+  const journalEntriesCollection = useMemo(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, 'users', user.uid, 'journalEntries');
+  }, [user, firestore]);
+
+  const { data: initialEntries, isLoading: areEntriesLoading } = useCollection(journalEntriesCollection);
 
   return (
     <div className="container mx-auto py-8">
@@ -16,7 +28,10 @@ export default async function JournalPage() {
         </div>
         <NewJournalEntry />
       </div>
-      <JournalList initialEntries={initialEntries} />
+      <JournalList 
+        initialEntries={initialEntries || []} 
+        isLoading={isUserLoading || areEntriesLoading} 
+      />
     </div>
   );
 }

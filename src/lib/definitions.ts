@@ -14,6 +14,7 @@ export type JournalEntry = {
   mood: Mood;
   content: string;
   summary: string;
+  userId: string;
 };
 
 export type ChatMessage = {

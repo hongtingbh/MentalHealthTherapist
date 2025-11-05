@@ -1,3 +1,4 @@
+'use client';
 import Link from "next/link";
 import {
   Activity,
@@ -26,10 +27,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getJournalEntries } from "@/lib/actions";
-import { Mood, MoodDataItem } from "@/lib/definitions";
+import { Mood, MoodDataItem, JournalEntry as JournalEntryType } from "@/lib/definitions";
 import { formatDistanceToNow } from "date-fns";
 import { MoodChart } from "@/components/dashboard/mood-chart";
+import { useCollection, useUser, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, query, orderBy, limit } from "firebase/firestore";
 
 const MOOD_ICONS: Record<Mood, React.ReactNode> = {
   Happy: <Smile className="h-5 w-5 text-green-500" />,
@@ -39,33 +41,34 @@ const MOOD_ICONS: Record<Mood, React.ReactNode> = {
   Anxious: <Activity className="h-5 w-5 text-yellow-500" />,
 };
 
-const getMoodData = async () => {
-  const entries = await getJournalEntries();
-  const moodCounts: Record<Mood, number> = {
-    Happy: 0,
-    Calm: 0,
-    Neutral: 0,
-    Sad: 0,
-    Anxious: 0,
-  };
 
-  entries.forEach((entry) => {
-    moodCounts[entry.mood]++;
-  });
+export default function Dashboard() {
+  const { user } = useUser();
+  const firestore = useFirestore();
 
-  const moodData: MoodDataItem[] = Object.entries(moodCounts).map(
-    ([mood, count]) => ({
-      mood: mood as Mood,
-      count,
-    })
-  );
+  const journalEntriesQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return query(collection(firestore, 'users', user.uid, 'journalEntries'), orderBy("createdAt", "desc"));
+  }, [user, firestore]);
 
-  return moodData;
-};
+  const recentEntriesQuery = useMemoFirebase(() => {
+    if (!journalEntriesQuery) return null;
+    return query(journalEntriesQuery, limit(5));
+  }, [journalEntriesQuery]);
 
-export default async function Dashboard() {
-  const recentEntries = (await getJournalEntries()).slice(0, 5);
-  const moodData = await getMoodData();
+  const { data: allEntries } = useCollection<JournalEntryType>(journalEntriesQuery);
+  const { data: recentEntries } = useCollection<JournalEntryType>(recentEntriesQuery);
+
+  const moodData: MoodDataItem[] = useMemoFirebase(() => {
+    const moodCounts: Record<Mood, number> = { Happy: 0, Calm: 0, Neutral: 0, Sad: 0, Anxious: 0 };
+    if (allEntries) {
+      allEntries.forEach((entry) => {
+        moodCounts[entry.mood]++;
+      });
+    }
+    return Object.entries(moodCounts).map(([mood, count]) => ({ mood: mood as Mood, count }));
+  }, [allEntries]);
+
 
   return (
     <div className="flex min-h-screen w-full flex-col">
@@ -79,7 +82,7 @@ export default async function Dashboard() {
               <BookHeart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{recentEntries.length}</div>
+              <div className="text-2xl font-bold">{allEntries?.length || 0}</div>
               <p className="text-xs text-muted-foreground">
                 entries logged all time
               </p>
@@ -152,7 +155,7 @@ export default async function Dashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentEntries.length > 0 ? (
+                  {recentEntries && recentEntries.length > 0 ? (
                     recentEntries.map((entry) => (
                       <TableRow key={entry.id}>
                         <TableCell>
@@ -164,9 +167,9 @@ export default async function Dashboard() {
                           <div className="font-medium">{entry.summary}</div>
                         </TableCell>
                         <TableCell className="hidden md:table-cell text-right">
-                          {formatDistanceToNow(new Date(entry.createdAt), {
+                          {entry.createdAt ? formatDistanceToNow(new Date(entry.createdAt), {
                             addSuffix: true,
-                          })}
+                          }) : 'Just now'}
                         </TableCell>
                       </TableRow>
                     ))
