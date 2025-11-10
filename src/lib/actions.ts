@@ -17,27 +17,26 @@ const NewEntrySchema = z.object({
 
 // Helper function to initialize Firebase Admin SDK
 function getAdminApp(): App {
-    if (getApps().length > 0) {
-      return getApps()[0];
-    }
-  
-    const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
-    
-    if (serviceAccountEnv) {
-      try {
-        const serviceAccount = JSON.parse(serviceAccountEnv);
-        return initializeApp({
-          credential: cert(serviceAccount)
-        });
-      } catch (e) {
-        console.error('Error parsing FIREBASE_SERVICE_ACCOUNT:', e);
-        // Fall through for local dev
-      }
-    }
-    
-    // For local development with GOOGLE_APPLICATION_CREDENTIALS
-    return initializeApp();
+  const appName = 'firebase-admin-app-server-actions';
+  const existingApp = getApps().find(app => app.name === appName);
+  if (existingApp) {
+    return existingApp;
   }
+
+  const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!serviceAccountEnv) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is not set.');
+  }
+
+  try {
+    const serviceAccount = JSON.parse(serviceAccountEnv);
+    return initializeApp({
+      credential: cert(serviceAccount)
+    }, appName);
+  } catch (e: any) {
+    throw new Error(`Failed to initialize Firebase Admin SDK: ${e.message}`);
+  }
+}
 
 
 export async function createJournalEntry(prevState: any, formData: FormData) {
