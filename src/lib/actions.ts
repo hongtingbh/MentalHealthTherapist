@@ -172,3 +172,39 @@ export async function deleteChatSession(userId: string, sessionId: string): Prom
     return { success: false, message };
   }
 }
+
+export async function deleteAllSessions(userId: string): Promise<{ success: boolean; message?: string }> {
+  if (!userId) {
+    return { success: false, message: 'User not authenticated.' };
+  }
+  try {
+    const adminApp = getAdminApp();
+    const db = getFirestore(adminApp);
+    const sessionsRef = db.collection('users').doc(userId).collection('sessions');
+    const sessionsSnapshot = await sessionsRef.get();
+
+    if (sessionsSnapshot.empty) {
+      return { success: true, message: 'No sessions to delete.' };
+    }
+
+    const batch = db.batch();
+
+    for (const sessionDoc of sessionsSnapshot.docs) {
+      const messagesRef = sessionDoc.ref.collection('messages');
+      const messagesSnapshot = await messagesRef.get();
+      messagesSnapshot.forEach(msgDoc => {
+        batch.delete(msgDoc.ref);
+      });
+      batch.delete(sessionDoc.ref);
+    }
+
+    await batch.commit();
+    
+    revalidatePath('/chat');
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting all sessions:', error);
+    const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+    return { success: false, message };
+  }
+}
