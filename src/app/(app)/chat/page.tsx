@@ -53,23 +53,23 @@ export default function ChatPage() {
     setActiveSessionId(newSessionRef.id);
   };
 
-
   useEffect(() => {
-    // This effect runs when sessions are loaded or changed.
-    if (!sessionsLoading) {
-      if (sessions && sessions.length > 0) {
-        // If there's no active session OR the active session was deleted, select a new one.
-        if (!activeSessionId || !sessions.some(s => s.id === activeSessionId)) {
+    if (!sessionsLoading && user && firestore) {
+      if (!sessions || sessions.length === 0) {
+        // No sessions exist, create the first one.
+        if (!activeSessionId) {
+          handleNewSession();
+        }
+      } else {
+        // Sessions exist.
+        const sessionIds = sessions.map(s => s.id);
+        if (activeSessionId === null || !sessionIds.includes(activeSessionId)) {
+          // If no session is active or the active one was deleted, select the first available one.
           setActiveSessionId(sessions[0].id);
         }
-      } else if (user && firestore && !activeSessionId) {
-        // If there are no sessions at all for the user, create the first one.
-        handleNewSession();
       }
     }
-  }, [sessions, sessionsLoading, activeSessionId, user, firestore]);
-
-
+  }, [sessions, sessionsLoading, user, firestore]);
 
   const selectSession = (sessionId: string) => {
     setActiveSessionId(sessionId);
