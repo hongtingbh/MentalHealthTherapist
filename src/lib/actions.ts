@@ -17,13 +17,10 @@ const NewEntrySchema = z.object({
 
 // Helper function to initialize Firebase Admin SDK
 function getAdminApp(): App {
-    // If the app is already initialized, return it.
     if (getApps().length > 0) {
       return getApps()[0];
     }
   
-    // Check for the service account environment variable.
-    // This is set by Firebase App Hosting.
     const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
     
     if (serviceAccountEnv) {
@@ -34,12 +31,11 @@ function getAdminApp(): App {
         });
       } catch (e) {
         console.error('Error parsing FIREBASE_SERVICE_ACCOUNT:', e);
-        // Fall through to try initializing without credentials for local dev
+        // Fall through for local dev
       }
     }
     
-    // For local development, it will use GOOGLE_APPLICATION_CREDENTIALS
-    // if that environment variable is set.
+    // For local development with GOOGLE_APPLICATION_CREDENTIALS
     return initializeApp();
   }
 
@@ -55,6 +51,7 @@ export async function createJournalEntry(prevState: any, formData: FormData) {
     return {
       errors: validatedFields.error.flatten().fieldErrors,
       message: 'Failed to create entry.',
+      success: false,
     };
   }
   
@@ -77,7 +74,7 @@ export async function createJournalEntry(prevState: any, formData: FormData) {
   } catch (error) {
     console.error('Error creating journal entry:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-    return { message: `Error saving to database: ${errorMessage}` };
+    return { message: `Error saving to database: ${errorMessage}`, success: false };
   }
 }
 
@@ -87,20 +84,15 @@ export async function postChatMessage(userId: string, sessionId: string, message
     const db = getFirestore(adminApp);
     const messagePath = `users/${userId}/sessions/${sessionId}/messages`;
 
-    // 1. Save user message to Firestore
-    const userMessage: Omit<ChatMessage, 'id' | 'classification' | 'selfHarmWarning'> = {
+    const userMessageData = {
       role: 'user',
       text: message,
       ...(mediaDataUri && { mediaUrl: mediaDataUri }),
-    };
-    await db.collection(messagePath).add({
-      ...userMessage,
       timestamp: FieldValue.serverTimestamp(),
       userId,
-    });
+    };
+    await db.collection(messagePath).add(userMessageData);
 
-
-    // 2. Check for self-harm
     const selfHarmCheck = await detectSelfHarm({ text: message });
     if (selfHarmCheck.selfHarmDetected) {
       const assistantMessage: ChatMessage = {
@@ -109,7 +101,6 @@ export async function postChatMessage(userId: string, sessionId: string, message
         selfHarmWarning: selfHarmCheck.guidance,
         text: 'It sounds like you are going through a difficult time. Please consider reaching out for professional help.',
       };
-      // Save assistant's warning message
       await db.collection(messagePath).add({
         ...assistantMessage,
         timestamp: FieldValue.serverTimestamp(),
@@ -119,7 +110,6 @@ export async function postChatMessage(userId: string, sessionId: string, message
       return assistantMessage;
     }
 
-    // 3. Classify mood disorders
     const classification = await classifyMoodDisorders({ message, mediaDataUri });
 
      const assistantResponse: ChatMessage = {
@@ -134,7 +124,6 @@ export async function postChatMessage(userId: string, sessionId: string, message
       },
     };
 
-    // Save assistant's response
     await db.collection(messagePath).add({
         text: assistantResponse.text,
         role: 'assistant',
@@ -153,5 +142,33 @@ export async function postChatMessage(userId: string, sessionId: string, message
       id: new Date().toISOString(),
       text: 'I apologize, but I encountered an error and cannot respond right now. Please try again later.',
     };
+  }
+}
+
+export async function deleteChatSession(userId: string, sessionId: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    const adminApp = getAdminApp();
+    const db = getFirestore(adminApp);
+
+    const sessionRef = db.collection('users').doc(userId).collection('sessions').doc(sessionId);
+    const messagesRef = sessionRef.collection('messages');
+
+    // Delete all messages in the subcollection
+    const messagesSnapshot = await messagesRef.get();
+    const batch = db.batch();
+    messagesSnapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+
+    // Delete the session document itself
+    await sessionRef.delete();
+
+    revalidatePath('/chat');
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting chat session:', error);
+    const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+    return { success: false, message };
   }
 }
