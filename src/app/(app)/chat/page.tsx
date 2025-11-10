@@ -7,30 +7,60 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlusCircle, MessageSquare } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, addDoc, serverTimestamp, query } from 'firebase/firestore';
 
 export default function ChatPage() {
-  const [sessions, setSessions] = useState(['Session 1']);
-  const [activeSession, setActiveSession] = useState('Session 1');
-  const [conversationId, setConversationId] = useState('Session 1');
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
-  const handleNewSession = () => {
-    const newSessionNumber = sessions.length + 1;
-    const newSessionName = `Session ${newSessionNumber}`;
-    setSessions([...sessions, newSessionName]);
-    setActiveSession(newSessionName);
-    setConversationId(newSessionName); // Change conversation ID to reset chat
+  const sessionsQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return query(collection(firestore, `users/${user.uid}/sessions`));
+  }, [user, firestore]);
+
+  const { data: sessions, isLoading: sessionsLoading } = useCollection(sessionsQuery);
+
+  useEffect(() => {
+    // If sessions are loaded and there's no active session, set the first one as active.
+    // If there are no sessions, create one.
+    if (!sessionsLoading) {
+      if (sessions && sessions.length > 0) {
+        if (!activeSessionId) {
+          setActiveSessionId(sessions[0].id);
+        }
+      } else if (user && firestore) {
+        handleNewSession();
+      }
+    }
+  }, [sessions, sessionsLoading, activeSessionId, user, firestore]);
+
+
+  const handleNewSession = async () => {
+    if (!user || !firestore) return;
+    const newSessionRef = await addDoc(collection(firestore, `users/${user.uid}/sessions`), {
+      createdAt: serverTimestamp(),
+      name: `Session ${sessions ? sessions.length + 1 : 1}`
+    });
+    setActiveSessionId(newSessionRef.id);
   };
 
-  const selectSession = (session: string) => {
-    setActiveSession(session);
-    setConversationId(session); // Change conversation ID to reset chat
+  const selectSession = (sessionId: string) => {
+    setActiveSessionId(sessionId);
   };
 
   return (
     <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
       <div className="h-full flex flex-col rounded-lg border">
-        <ChatLayout key={conversationId} />
+        {activeSessionId ? (
+          <ChatLayout sessionId={activeSessionId} key={activeSessionId} />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <p>Loading or creating session...</p>
+          </div>
+        )}
       </div>
       <div className="hidden lg:flex flex-col gap-6">
         <Card>
@@ -55,15 +85,15 @@ export default function ChatPage() {
             </Button>
             <ScrollArea className="flex-grow">
                 <div className="flex flex-col gap-2">
-                    {sessions.map((session, index) => (
+                    {sessionsLoading ? <p>Loading sessions...</p> : sessions?.map((session) => (
                         <Button 
-                            key={index} 
-                            variant={activeSession === session ? 'secondary' : 'ghost'} 
+                            key={session.id} 
+                            variant={activeSessionId === session.id ? 'secondary' : 'ghost'} 
                             className="justify-start"
-                            onClick={() => selectSession(session)}
+                            onClick={() => selectSession(session.id)}
                         >
                             <MessageSquare className="mr-2 h-4 w-4" />
-                            {session}
+                            {session.name || `Session ${session.id.substring(0, 4)}`}
                         </Button>
                     ))}
                 </div>

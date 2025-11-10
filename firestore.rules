@@ -7,7 +7,7 @@
  * Data Structure:
  * - /users/{userId}: Stores user profile data. The userId corresponds to the Firebase Authentication UID.
  * - /users/{userId}/journalEntries/{journalEntryId}: Stores journal entries for each user.
- * - /users/{userId}/chatMessages/{chatMessageId}: Stores chat messages for each user.
+ * - /users/{userId}/sessions/{sessionId}/messages/{messageId}: Stores chat messages for each user, organized by session.
  *
  * Key Security Decisions:
  * - User data is strictly private and only accessible to the authenticated user.
@@ -20,100 +20,34 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Secures user profile data, ensuring only the authenticated user can read and write their own profile.
-     * @path /users/{userId}
-     * @allow (create, update, delete, get) User with matching UID can manage their profile.
-     *  Example: request.auth.uid == 'user123'
-     * @deny (create, update, delete, get) User attempts to access another user's profile.
-     *  Example: request.auth.uid == 'user456', userId == 'user123'
-     * @principle Enforces document ownership for all operations.
-     */
+    // isSignedIn() checks if the request is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // isOwner(userId) checks if the authenticated user's UID matches the provided userId.
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
     match /users/{userId} {
-      // isSignedIn() checks if the request is authenticated
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // isOwner(userId) checks if the authenticated user's UID matches the provided userId.
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-
-      // isExistingOwner(userId) checks if the user is the owner and the document exists.
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
       allow get: if isOwner(userId);
       allow list: if false; // Listing users is not permitted.
       allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
-    }
+      allow update: if isOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isOwner(userId);
 
-    /**
-     * @description Secures journal entries, ensuring only the authenticated user can read and write their own entries.
-     * @path /users/{userId}/journalEntries/{journalEntryId}
-     * @allow (create, update, delete, get, list) User with matching UID can manage their journal entries.
-     *  Example: request.auth.uid == 'user123', userId == 'user123'
-     * @deny (create, update, delete, get, list) User attempts to access another user's journal entries.
-     *  Example: request.auth.uid == 'user456', userId == 'user123'
-     * @principle Enforces document ownership for all operations.
-     */
-    match /users/{userId}/journalEntries/{journalEntryId} {
-      // isSignedIn() checks if the request is authenticated
-      function isSignedIn() {
-        return request.auth != null;
+      match /journalEntries/{journalEntryId} {
+        allow read, write: if isOwner(userId);
       }
 
-      // isOwner(userId) checks if the authenticated user's UID matches the provided userId.
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
+      match /sessions/{sessionId} {
+        allow read, write: if isOwner(userId);
+
+        match /messages/{messageId} {
+          allow read, write: if isOwner(userId);
+        }
       }
-
-      // isExistingOwner(userId) checks if the user is the owner and the document exists.
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
-    }
-
-    /**
-     * @description Secures chat messages, ensuring only the authenticated user can read and write their own messages.
-     * @path /users/{userId}/chatMessages/{chatMessageId}
-     * @allow (create, update, delete, get, list) User with matching UID can manage their chat messages.
-     *  Example: request.auth.uid == 'user123', userId == 'user123'
-     * @deny (create, update, delete, get, list) User attempts to access another user's chat messages.
-     *  Example: request.auth.uid == 'user456', userId == 'user123'
-     * @principle Enforces document ownership for all operations.
-     */
-    match /users/{userId}/chatMessages/{chatMessageId} {
-      // isSignedIn() checks if the request is authenticated
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      // isOwner(userId) checks if the authenticated user's UID matches the provided userId.
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-
-      // isExistingOwner(userId) checks if the user is the owner and the document exists.
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
-      allow delete: if isExistingOwner(userId);
     }
   }
 }

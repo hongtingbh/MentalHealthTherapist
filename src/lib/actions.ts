@@ -75,10 +75,11 @@ export async function createJournalEntry(prevState: any, formData: FormData) {
   }
 }
 
-export async function postChatMessage(userId: string, message: string, mediaDataUri?: string): Promise<ChatMessage> {
+export async function postChatMessage(userId: string, sessionId: string, message: string, mediaDataUri?: string): Promise<ChatMessage> {
   try {
     const adminApp = getAdminApp();
     const db = getFirestore(adminApp);
+    const messagePath = `users/${userId}/sessions/${sessionId}/messages`;
 
     // 1. Save user message to Firestore
     const userMessage: Omit<ChatMessage, 'id' | 'classification' | 'selfHarmWarning'> = {
@@ -86,7 +87,7 @@ export async function postChatMessage(userId: string, message: string, mediaData
       text: message,
       ...(mediaDataUri && { mediaUrl: mediaDataUri }),
     };
-    await db.collection('users').doc(userId).collection('chatMessages').add({
+    await db.collection(messagePath).add({
       ...userMessage,
       timestamp: FieldValue.serverTimestamp(),
       userId,
@@ -103,7 +104,7 @@ export async function postChatMessage(userId: string, message: string, mediaData
         text: 'It sounds like you are going through a difficult time. Please consider reaching out for professional help.',
       };
       // Save assistant's warning message
-      await db.collection('users').doc(userId).collection('chatMessages').add({
+      await db.collection(messagePath).add({
         ...assistantMessage,
         timestamp: FieldValue.serverTimestamp(),
         userId,
@@ -127,7 +128,7 @@ export async function postChatMessage(userId: string, message: string, mediaData
     };
 
     // Save assistant's response
-    await db.collection('users').doc(userId).collection('chatMessages').add({
+    await db.collection(messagePath).add({
         text: assistantResponse.text,
         role: 'assistant',
         classification: assistantResponse.classification,

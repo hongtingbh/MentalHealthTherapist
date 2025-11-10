@@ -30,6 +30,7 @@ export type ChatMessage = {
     summary: string;
   };
   selfHarmWarning?: string;
+  sessionId?: string;
 };
 
 export type MoodDataItem = {

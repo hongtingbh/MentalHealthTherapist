@@ -41,7 +41,7 @@ const fileToDataURL = (file: File): Promise<string> => {
     });
 };
 
-export function ChatLayout() {
+export function ChatLayout({ sessionId }: { sessionId: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([assistantWelcomeMessage]);
   const [input, setInput] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -53,22 +53,25 @@ export function ChatLayout() {
   const firestore = useFirestore();
 
   const messagesQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
+    if (!user || !firestore || !sessionId) return null;
     return query(
-      collection(firestore, 'users', user.uid, 'chatMessages'),
+      collection(firestore, `users/${user.uid}/sessions/${sessionId}/messages`),
       orderBy('timestamp', 'asc')
     );
-  }, [user, firestore]);
+  }, [user, firestore, sessionId]);
 
   const { data: initialMessages } = useCollection<ChatMessage>(messagesQuery);
   
   useEffect(() => {
-    if (initialMessages && initialMessages.length > 0) {
-      setMessages([assistantWelcomeMessage, ...initialMessages]);
-    } else {
-      setMessages([assistantWelcomeMessage]);
+    if (initialMessages) {
+      if (initialMessages.length > 0) {
+        setMessages([assistantWelcomeMessage, ...initialMessages]);
+      } else {
+        setMessages([assistantWelcomeMessage]);
+      }
     }
   }, [initialMessages]);
+
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -115,7 +118,7 @@ export function ChatLayout() {
 
 
     startTransition(async () => {
-      const assistantResponse = await postChatMessage(user.uid, input, mediaDataUri);
+      const assistantResponse = await postChatMessage(user.uid, sessionId, input, mediaDataUri);
       setMessages((prev) => [...prev, assistantResponse]);
     });
   };
