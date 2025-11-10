@@ -22,7 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useToast } from '@/hooks/use-toast';
-import { deleteChatSession } from '@/lib/actions';
+import { deleteChatSession, deleteAllUserSessions } from '@/lib/actions';
 
 
 export default function ChatPage() {
@@ -31,6 +31,7 @@ export default function ChatPage() {
   const { toast } = useToast();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [isDeleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
 
   const sessionsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -58,9 +59,7 @@ export default function ChatPage() {
     if (!sessionsLoading && user && firestore) {
       if (!sessions || sessions.length === 0) {
         // No sessions exist, create the first one if it's not already being created.
-        if (!activeSessionId) {
-          handleNewSession();
-        }
+        handleNewSession();
       } else {
         // Sessions exist.
         const sessionIds = sessions.map(s => s.id);
@@ -70,7 +69,7 @@ export default function ChatPage() {
         }
       }
     }
-  }, [sessions, sessionsLoading, user, firestore, activeSessionId]); // Added activeSessionId dependency
+  }, [sessions, sessionsLoading, user, firestore]); 
 
 
   const selectSession = (sessionId: string) => {
@@ -90,8 +89,24 @@ export default function ChatPage() {
     setSessionToDelete(null); // Close the dialog
   };
   
+  const handleDeleteAllConfirm = async () => {
+    if (!user) return;
+    const result = await deleteAllUserSessions(user.uid);
+    if (result.success) {
+      toast({ title: "All sessions deleted", description: "All your chat history has been removed." });
+    } else {
+      toast({ title: "Error", description: result.message, variant: 'destructive' });
+    }
+    setDeleteAllConfirmOpen(false); // Close the dialog
+  };
+
   return (
-    <AlertDialog onOpenChange={(open) => !open && setSessionToDelete(null)}>
+    <AlertDialog onOpenChange={(open) => {
+      if(!open) {
+        setSessionToDelete(null);
+        setDeleteAllConfirmOpen(false);
+      }
+    }}>
         <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
         <div className="h-full flex flex-col rounded-lg border">
             {activeSessionId ? (
@@ -116,8 +131,17 @@ export default function ChatPage() {
             </Card>
             <Card className="flex-grow">
             <CardHeader>
-                <CardTitle>Sessions</CardTitle>
-                <CardDescription>Start a new session or review a past one.</CardDescription>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Sessions</CardTitle>
+                    <CardDescription>Start or review a session.</CardDescription>
+                  </div>
+                   <AlertDialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleteAllConfirmOpen(true)} disabled={!sessions || sessions.length === 0}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                </div>
             </CardHeader>
             <CardContent className="flex flex-col h-[calc(100%-10rem)]">
                 <Button className="mb-4" onClick={handleNewSession}>
@@ -157,16 +181,34 @@ export default function ChatPage() {
         </div>
         </div>
         <AlertDialogContent>
-        <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete this chat session and all of its messages.
-            </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
-        </AlertDialogFooter>
+        {sessionToDelete && (
+          <>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete this chat session and all of its messages.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setSessionToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </>
+        )}
+        {isDeleteAllConfirmOpen && (
+           <>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete all sessions?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete ALL chat sessions and messages.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeleteAllConfirmOpen(false)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteAllConfirm}>Delete All</AlertDialogAction>
+            </AlertDialogFooter>
+           </>
+        )}
         </AlertDialogContent>
     </AlertDialog>
   );
