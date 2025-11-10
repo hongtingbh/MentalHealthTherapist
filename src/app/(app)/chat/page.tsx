@@ -9,16 +9,28 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
-// Mock data for sessions
-const SESSIONS = ['Session 1', 'Session 2', 'Session 3'];
-
 export default function ChatPage() {
-    const [activeSession, setActiveSession] = useState('Session 3');
+  const [sessions, setSessions] = useState(['Session 1']);
+  const [activeSession, setActiveSession] = useState('Session 1');
+  const [conversationId, setConversationId] = useState('Session 1');
+
+  const handleNewSession = () => {
+    const newSessionNumber = sessions.length + 1;
+    const newSessionName = `Session ${newSessionNumber}`;
+    setSessions([...sessions, newSessionName]);
+    setActiveSession(newSessionName);
+    setConversationId(newSessionName); // Change conversation ID to reset chat
+  };
+
+  const selectSession = (session: string) => {
+    setActiveSession(session);
+    setConversationId(session); // Change conversation ID to reset chat
+  };
 
   return (
     <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
       <div className="h-full flex flex-col rounded-lg border">
-        <ChatLayout />
+        <ChatLayout key={conversationId} />
       </div>
       <div className="hidden lg:flex flex-col gap-6">
         <Card>
@@ -38,17 +50,17 @@ export default function ChatPage() {
             <CardDescription>Start a new session or review a past one.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col h-[calc(100%-10rem)]">
-            <Button className="mb-4">
+            <Button className="mb-4" onClick={handleNewSession}>
               <PlusCircle className="mr-2 h-4 w-4" /> New Session
             </Button>
             <ScrollArea className="flex-grow">
                 <div className="flex flex-col gap-2">
-                    {SESSIONS.map((session, index) => (
+                    {sessions.map((session, index) => (
                         <Button 
                             key={index} 
                             variant={activeSession === session ? 'secondary' : 'ghost'} 
                             className="justify-start"
-                            onClick={() => setActiveSession(session)}
+                            onClick={() => selectSession(session)}
                         >
                             <MessageSquare className="mr-2 h-4 w-4" />
                             {session}
