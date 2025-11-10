@@ -57,14 +57,14 @@ export default function Dashboard() {
     return query(journalEntriesQuery, limit(5));
   }, [journalEntriesQuery]);
   
-  const chatMessagesQuery = useMemoFirebase(() => {
+  const chatSessionsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
-    return query(collection(firestore, 'users', user.uid, 'chatMessages'));
+    return query(collection(firestore, 'users', user.uid, 'sessions'));
   }, [user, firestore]);
 
   const { data: allEntries } = useCollection<JournalEntryType>(journalEntriesQuery);
   const { data: recentEntries } = useCollection<JournalEntryType>(recentEntriesQuery);
-  const { data: allMessages } = useCollection(chatMessagesQuery);
+  const { data: allSessions } = useCollection(chatSessionsQuery);
 
   const moodData: MoodDataItem[] = useMemo(() => {
     const moodCounts: Record<Mood, number> = { Happy: 0, Calm: 0, Neutral: 0, Sad: 0, Anxious: 0 };
@@ -100,14 +100,14 @@ export default function Dashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Total Messages
+                Total Sessions
               </CardTitle>
               <MessageSquare className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{allMessages?.length || 0}</div>
+              <div className="text-2xl font-bold">{allSessions?.length || 0}</div>
               <p className="text-xs text-muted-foreground">
-                messages sent and received
+                chat sessions started
               </p>
             </CardContent>
           </Card>
