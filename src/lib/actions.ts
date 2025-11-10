@@ -6,7 +6,7 @@ import { detectSelfHarm } from '@/ai/flows/detect-potential-self-harm';
 import { classifyMoodDisorders } from '@/ai/flows/classify-mood-disorders';
 import { JournalEntry, Mood, ChatMessage } from './definitions';
 import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
-import { initializeApp, getApps, App, cert } from 'firebase-admin/app';
+import { initializeApp, getApps, App } from 'firebase-admin/app';
 
 const NewEntrySchema = z.object({
   content: z.string().min(1, 'Journal entry cannot be empty.'),
@@ -22,20 +22,9 @@ function getAdminApp(): App {
   if (existingApp) {
     return existingApp;
   }
-
-  const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!serviceAccountEnv) {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT environment variable is not set.');
-  }
-
-  try {
-    const serviceAccount = JSON.parse(serviceAccountEnv);
-    return initializeApp({
-      credential: cert(serviceAccount)
-    }, appName);
-  } catch (e: any) {
-    throw new Error(`Failed to initialize Firebase Admin SDK: ${e.message}`);
-  }
+  // In a managed environment like Firebase App Hosting or Cloud Run,
+  // initializeApp() without arguments will use the project's service account.
+  return initializeApp({}, appName);
 }
 
 
