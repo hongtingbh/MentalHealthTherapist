@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Sparkles } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp, query } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, getDocs } from 'firebase/firestore';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,39 +34,42 @@ export default function ChatPage() {
 
   const sessionsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
-    return query(collection(firestore, `users/${user.uid}/sessions`));
+    return query(collection(firestore, `users/${user.uid}/sessions`), orderBy('createdAt', 'asc'));
   }, [user, firestore]);
 
   const { data: sessions, isLoading: sessionsLoading } = useCollection(sessionsQuery);
 
+  const handleNewSession = async () => {
+    if (!user || !firestore) return;
+
+    // To prevent race conditions, fetch the current count directly
+    const sessionsSnapshot = await getDocs(sessionsQuery!);
+    const sessionCount = sessionsSnapshot.size;
+
+    const newSessionRef = await addDoc(collection(firestore, `users/${user.uid}/sessions`), {
+      createdAt: serverTimestamp(),
+      name: `Session ${sessionCount + 1}`
+    });
+    setActiveSessionId(newSessionRef.id);
+  };
+
+
   useEffect(() => {
+    // This effect runs when sessions are loaded or changed.
     if (!sessionsLoading) {
       if (sessions && sessions.length > 0) {
+        // If there's no active session OR the active session was deleted, select a new one.
         if (!activeSessionId || !sessions.some(s => s.id === activeSessionId)) {
-          // If there's no active session or the active one was deleted, select the first available.
           setActiveSessionId(sessions[0].id);
         }
-      } else if (user && firestore) {
-        // If there are no sessions at all, create a new one.
-        if (!activeSessionId) {
-             handleNewSession();
-        }
-      } else if (!sessions || sessions.length === 0) {
-        // If sessions are loaded and empty, clear the active session.
-        setActiveSessionId(null);
+      } else if (user && firestore && !activeSessionId) {
+        // If there are no sessions at all for the user, create the first one.
+        handleNewSession();
       }
     }
   }, [sessions, sessionsLoading, activeSessionId, user, firestore]);
 
 
-  const handleNewSession = async () => {
-    if (!user || !firestore) return;
-    const newSessionRef = await addDoc(collection(firestore, `users/${user.uid}/sessions`), {
-      createdAt: serverTimestamp(),
-      name: `Session ${sessions ? sessions.length + 1 : 1}`
-    });
-    setActiveSessionId(newSessionRef.id);
-  };
 
   const selectSession = (sessionId: string) => {
     setActiveSessionId(sessionId);
@@ -82,7 +85,7 @@ export default function ChatPage() {
     } else {
       toast({ title: "Error", description: result.message, variant: 'destructive' });
     }
-    setSessionToDelete(null);
+    setSessionToDelete(null); // Close the dialog
   };
 
   return (
@@ -90,7 +93,7 @@ export default function ChatPage() {
         <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
         <div className="h-full flex flex-col rounded-lg border">
             {activeSessionId ? (
-            <ChatLayout sessionId={activeSessionId} key={activeSessionId} />
+                <ChatLayout sessionId={activeSessionId} key={activeSessionId} />
             ) : (
             <div className="flex items-center justify-center h-full">
                 <p>Loading or creating session...</p>
