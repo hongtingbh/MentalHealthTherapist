@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Sparkles } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp, query, deleteDoc, doc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query } from 'firebase/firestore';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,10 +43,17 @@ export default function ChatPage() {
     if (!sessionsLoading) {
       if (sessions && sessions.length > 0) {
         if (!activeSessionId || !sessions.some(s => s.id === activeSessionId)) {
+          // If there's no active session or the active one was deleted, select the first available.
           setActiveSessionId(sessions[0].id);
         }
       } else if (user && firestore) {
-        handleNewSession();
+        // If there are no sessions at all, create a new one.
+        if (!activeSessionId) {
+             handleNewSession();
+        }
+      } else if (!sessions || sessions.length === 0) {
+        // If sessions are loaded and empty, clear the active session.
+        setActiveSessionId(null);
       }
     }
   }, [sessions, sessionsLoading, activeSessionId, user, firestore]);
@@ -72,9 +79,6 @@ export default function ChatPage() {
 
     if (result.success) {
       toast({ title: "Session deleted", description: "The session and all its messages have been removed." });
-      if (activeSessionId === sessionToDelete) {
-        setActiveSessionId(null);
-      }
     } else {
       toast({ title: "Error", description: result.message, variant: 'destructive' });
     }
@@ -82,7 +86,7 @@ export default function ChatPage() {
   };
 
   return (
-    <AlertDialog>
+    <AlertDialog onOpenChange={(open) => !open && setSessionToDelete(null)}>
         <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
         <div className="h-full flex flex-col rounded-lg border">
             {activeSessionId ? (
@@ -131,7 +135,7 @@ export default function ChatPage() {
                                         variant="ghost" 
                                         size="icon" 
                                         className="h-8 w-8 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive"
-                                        onClick={() => setSessionToDelete(session.id)}
+                                        onClick={(e) => { e.stopPropagation(); setSessionToDelete(session.id); }}
                                     >
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
@@ -152,7 +156,7 @@ export default function ChatPage() {
             </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setSessionToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
         </AlertDialogFooter>
         </AlertDialogContent>
