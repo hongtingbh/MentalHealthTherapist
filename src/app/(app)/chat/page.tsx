@@ -22,7 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useToast } from '@/hooks/use-toast';
-import { deleteChatSession, deleteAllUserSessions } from '@/lib/actions';
+import { deleteChatSession } from '@/lib/actions';
 
 
 export default function ChatPage() {
@@ -31,7 +31,6 @@ export default function ChatPage() {
   const { toast } = useToast();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
-  const [isDeleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
 
   const sessionsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -69,7 +68,7 @@ export default function ChatPage() {
         }
       }
     }
-  }, [sessions, sessionsLoading, user, firestore]); 
+  }, [sessions, sessionsLoading, user, firestore, activeSessionId]); 
 
 
   const selectSession = (sessionId: string) => {
@@ -88,23 +87,11 @@ export default function ChatPage() {
     }
     setSessionToDelete(null); // Close the dialog
   };
-  
-  const handleDeleteAllConfirm = async () => {
-    if (!user) return;
-    const result = await deleteAllUserSessions(user.uid);
-    if (result.success) {
-      toast({ title: "All sessions deleted", description: "All your chat history has been removed." });
-    } else {
-      toast({ title: "Error", description: result.message, variant: 'destructive' });
-    }
-    setDeleteAllConfirmOpen(false); // Close the dialog
-  };
 
   return (
     <AlertDialog onOpenChange={(open) => {
       if(!open) {
         setSessionToDelete(null);
-        setDeleteAllConfirmOpen(false);
       }
     }}>
         <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
@@ -136,11 +123,6 @@ export default function ChatPage() {
                     <CardTitle>Sessions</CardTitle>
                     <CardDescription>Start or review a session.</CardDescription>
                   </div>
-                   <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDeleteAllConfirmOpen(true)} disabled={!sessions || sessions.length === 0}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </AlertDialogTrigger>
                 </div>
             </CardHeader>
             <CardContent className="flex flex-col h-[calc(100%-10rem)]">
@@ -194,20 +176,6 @@ export default function ChatPage() {
               <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
             </AlertDialogFooter>
           </>
-        )}
-        {isDeleteAllConfirmOpen && (
-           <>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete all sessions?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete ALL chat sessions and messages.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setDeleteAllConfirmOpen(false)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteAllConfirm}>Delete All</AlertDialogAction>
-            </AlertDialogFooter>
-           </>
         )}
         </AlertDialogContent>
     </AlertDialog>

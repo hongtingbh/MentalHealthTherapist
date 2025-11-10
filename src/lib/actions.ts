@@ -172,37 +172,3 @@ export async function deleteChatSession(userId: string, sessionId: string): Prom
     return { success: false, message };
   }
 }
-
-export async function deleteAllUserSessions(userId: string): Promise<{ success: boolean; message?: string }> {
-    try {
-      const adminApp = getAdminApp();
-      const db = getFirestore(adminApp);
-      const sessionsRef = db.collection('users').doc(userId).collection('sessions');
-      const sessionsSnapshot = await sessionsRef.get();
-  
-      if (sessionsSnapshot.empty) {
-        return { success: true, message: "No sessions to delete." };
-      }
-  
-      const batch = db.batch();
-  
-      // Iterate over each session to delete its subcollections
-      for (const sessionDoc of sessionsSnapshot.docs) {
-        const messagesRef = sessionDoc.ref.collection('messages');
-        const messagesSnapshot = await messagesRef.get();
-        messagesSnapshot.forEach(msgDoc => batch.delete(msgDoc.ref));
-        
-        // Also delete the session doc itself
-        batch.delete(sessionDoc.ref);
-      }
-  
-      await batch.commit();
-  
-      revalidatePath('/chat');
-      return { success: true };
-    } catch (error) {
-      console.error('Error deleting all user sessions:', error);
-      const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-      return { success: false, message };
-    }
-  }
