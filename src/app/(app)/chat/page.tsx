@@ -98,6 +98,8 @@ export default function ChatPage() {
     setIsClearAllDialogOpen(false);
   }
 
+  const canDelete = sessions ? sessions.length > 1 : false;
+
   return (
     <AlertDialog>
         <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
@@ -129,8 +131,8 @@ export default function ChatPage() {
                     <CardTitle>Sessions</CardTitle>
                     <CardDescription>Start or review a session.</CardDescription>
                   </div>
-                   <AlertDialogTrigger asChild onSelect={() => setIsClearAllDialogOpen(true)}>
-                    <Button variant="outline" size="sm">
+                   <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={!canDelete} onClick={() => setIsClearAllDialogOpen(true)}>
                       <Trash2 className="mr-2 h-4 w-4" /> Clear All
                     </Button>
                   </AlertDialogTrigger>
@@ -156,10 +158,14 @@ export default function ChatPage() {
                                     <Button 
                                         variant="ghost" 
                                         size="icon" 
-                                        className="h-8 w-8 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive"
+                                        className="h-8 w-8 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
+                                        disabled={!canDelete}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            setSessionToDelete(session.id);
+                                            if (canDelete) {
+                                                setSessionToDelete(session.id);
+                                                setIsClearAllDialogOpen(false);
+                                            }
                                         }}
                                     >
                                         <Trash2 className="h-4 w-4" />
@@ -174,7 +180,6 @@ export default function ChatPage() {
         </div>
         </div>
         
-        {/* This feels a bit clunky having two dialog contents. Let's see if there's a better way. */}
         <AlertDialogContent>
           {sessionToDelete ? (
             <>
