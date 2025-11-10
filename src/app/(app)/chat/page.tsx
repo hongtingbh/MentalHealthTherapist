@@ -22,7 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useToast } from '@/hooks/use-toast';
-import { deleteChatSession, deleteAllSessions } from '@/lib/actions';
+import { deleteChatSession } from '@/lib/actions';
 
 
 export default function ChatPage() {
@@ -31,7 +31,6 @@ export default function ChatPage() {
   const { toast } = useToast();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
-  const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
 
   const sessionsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -87,17 +86,6 @@ export default function ChatPage() {
     setSessionToDelete(null);
   };
   
-  const handleClearAllConfirm = async () => {
-    if (!user) return;
-    const result = await deleteAllSessions(user.uid);
-     if (result.success) {
-      toast({ title: "All sessions deleted", description: "Your chat history has been cleared." });
-    } else {
-      toast({ title: "Error", description: result.message, variant: 'destructive' });
-    }
-    setIsClearAllDialogOpen(false);
-  }
-
   const canDelete = sessions ? sessions.length > 1 : false;
 
   return (
@@ -131,11 +119,6 @@ export default function ChatPage() {
                     <CardTitle>Sessions</CardTitle>
                     <CardDescription>Start or review a session.</CardDescription>
                   </div>
-                   <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={!canDelete} onClick={() => setIsClearAllDialogOpen(true)}>
-                      <Trash2 className="mr-2 h-4 w-4" /> Clear All
-                    </Button>
-                  </AlertDialogTrigger>
                 </div>
             </CardHeader>
             <CardContent className="flex flex-col h-[calc(100%-10rem)]">
@@ -164,7 +147,6 @@ export default function ChatPage() {
                                             e.stopPropagation();
                                             if (canDelete) {
                                                 setSessionToDelete(session.id);
-                                                setIsClearAllDialogOpen(false);
                                             }
                                         }}
                                     >
@@ -181,7 +163,7 @@ export default function ChatPage() {
         </div>
         
         <AlertDialogContent>
-          {sessionToDelete ? (
+          {sessionToDelete && (
             <>
               <AlertDialogHeader>
                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
@@ -194,20 +176,7 @@ export default function ChatPage() {
                 <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
               </AlertDialogFooter>
             </>
-          ) : isClearAllDialogOpen ? (
-            <>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete all sessions?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will permanently delete all of your chat sessions and their messages. This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setIsClearAllDialogOpen(false)}>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleClearAllConfirm}>Delete All</AlertDialogAction>
-              </AlertDialogFooter>
-            </>
-          ) : null}
+          )}
         </AlertDialogContent>
     </AlertDialog>
   );

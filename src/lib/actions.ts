@@ -12,13 +12,8 @@ import {
   collection,
   addDoc,
   serverTimestamp,
-  doc,
-  deleteDoc,
-  getDocs,
-  writeBatch,
 } from 'firebase/firestore';
-import { getApp, initializeApp } from 'firebase/app';
-import { firebaseConfig } from '@/firebase/config';
+import { getApp } from 'firebase/app';
 import admin from 'firebase-admin';
 
 // Helper to get the initialized Firebase Admin App
@@ -181,45 +176,6 @@ export async function deleteChatSession(
     return { success: true };
   } catch (error) {
     console.error('Error deleting chat session:', error);
-    const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-    return { success: false, message };
-  }
-}
-
-// --------------------
-// Delete all sessions
-// --------------------
-export async function deleteAllSessions(
-  userId: string
-): Promise<{ success: boolean; message?: string }> {
-  if (!userId) return { success: false, message: 'User not authenticated.' };
-
-  try {
-    const adminDb = getAdminApp().firestore();
-    const sessionsRef = adminDb.collection(`users/${userId}/sessions`);
-    const sessionsSnapshot = await sessionsRef.get();
-
-    if (sessionsSnapshot.empty) {
-      revalidatePath('/chat');
-      return { success: true, message: 'No sessions to delete.' };
-    }
-
-    const batch = adminDb.batch();
-    for (const sessionDoc of sessionsSnapshot.docs) {
-      const messagesSnapshot = await sessionDoc.ref.collection('messages').get();
-       if (!messagesSnapshot.empty) {
-        messagesSnapshot.docs.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-      }
-      batch.delete(sessionDoc.ref);
-    }
-    await batch.commit();
-
-    revalidatePath('/chat');
-    return { success: true };
-  } catch (error) {
-    console.error('Error deleting all sessions:', error);
     const message = error instanceof Error ? error.message : 'An unknown error occurred.';
     return { success: false, message };
   }
