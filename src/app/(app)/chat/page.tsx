@@ -4,7 +4,7 @@ import { ChatLayout } from '@/components/chat/chat-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, MessageSquare } from 'lucide-react';
+import { PlusCircle, MessageSquare, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Sparkles } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -86,15 +86,19 @@ export default function ChatPage() {
             <ScrollArea className="flex-grow">
                 <div className="flex flex-col gap-2">
                     {sessionsLoading ? <p>Loading sessions...</p> : sessions?.map((session) => (
-                        <Button 
-                            key={session.id} 
-                            variant={activeSessionId === session.id ? 'secondary' : 'ghost'} 
-                            className="justify-start"
-                            onClick={() => selectSession(session.id)}
-                        >
-                            <MessageSquare className="mr-2 h-4 w-4" />
-                            {session.name || `Session ${session.id.substring(0, 4)}`}
-                        </Button>
+                        <div key={session.id} className="flex items-center gap-2 group">
+                            <Button 
+                                variant={activeSessionId === session.id ? 'secondary' : 'ghost'} 
+                                className="justify-start flex-grow w-0"
+                                onClick={() => selectSession(session.id)}
+                            >
+                                <MessageSquare className="mr-2 h-4 w-4 flex-shrink-0" />
+                                <span className="truncate">{session.name || `Session ${session.id.substring(0, 4)}`}</span>
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Trash2 className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                        </div>
                     ))}
                 </div>
             </ScrollArea>
