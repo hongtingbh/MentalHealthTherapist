@@ -54,9 +54,10 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
+    // This effect handles session initialization and selection logic.
     if (!sessionsLoading && user && firestore) {
       if (!sessions || sessions.length === 0) {
-        // No sessions exist, create the first one.
+        // No sessions exist, create the first one if it's not already being created.
         if (!activeSessionId) {
           handleNewSession();
         }
@@ -69,7 +70,8 @@ export default function ChatPage() {
         }
       }
     }
-  }, [sessions, sessionsLoading, user, firestore]);
+  }, [sessions, sessionsLoading, user, firestore, activeSessionId]); // Added activeSessionId dependency
+
 
   const selectSession = (sessionId: string) => {
     setActiveSessionId(sessionId);
@@ -87,7 +89,7 @@ export default function ChatPage() {
     }
     setSessionToDelete(null); // Close the dialog
   };
-
+  
   return (
     <AlertDialog onOpenChange={(open) => !open && setSessionToDelete(null)}>
         <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
@@ -138,7 +140,10 @@ export default function ChatPage() {
                                         variant="ghost" 
                                         size="icon" 
                                         className="h-8 w-8 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive"
-                                        onClick={(e) => { e.stopPropagation(); setSessionToDelete(session.id); }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSessionToDelete(session.id);
+                                        }}
                                     >
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
