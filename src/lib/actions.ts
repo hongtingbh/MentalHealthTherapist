@@ -16,26 +16,32 @@ const NewEntrySchema = z.object({
 
 
 // Helper function to initialize Firebase Admin SDK
-function getAdminApp() {
-  if (getApps().length > 0) {
-    return getApps()[0];
-  }
+function getAdminApp(): App {
+    // If the app is already initialized, return it.
+    if (getApps().length > 0) {
+      return getApps()[0];
+    }
   
-  // This environment variable is set by Firebase App Hosting.
-  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
-    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-    : undefined;
-
-  if (serviceAccount) {
-    return initializeApp({
-        credential: cert(serviceAccount)
-    });
+    // Check for the service account environment variable.
+    // This is set by Firebase App Hosting.
+    const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
+    
+    if (serviceAccountEnv) {
+      try {
+        const serviceAccount = JSON.parse(serviceAccountEnv);
+        return initializeApp({
+          credential: cert(serviceAccount)
+        });
+      } catch (e) {
+        console.error('Error parsing FIREBASE_SERVICE_ACCOUNT:', e);
+        // Fall through to try initializing without credentials for local dev
+      }
+    }
+    
+    // For local development, it will use GOOGLE_APPLICATION_CREDENTIALS
+    // if that environment variable is set.
+    return initializeApp();
   }
-
-  // Fallback for local development if the service account isn't set.
-  // Note: This requires the GOOGLE_APPLICATION_CREDENTIALS env var to be set.
-  return initializeApp();
-}
 
 
 export async function createJournalEntry(prevState: any, formData: FormData) {
@@ -109,6 +115,7 @@ export async function postChatMessage(userId: string, sessionId: string, message
         timestamp: FieldValue.serverTimestamp(),
         userId,
       });
+      revalidatePath('/chat');
       return assistantMessage;
     }
 
@@ -135,7 +142,8 @@ export async function postChatMessage(userId: string, sessionId: string, message
         timestamp: FieldValue.serverTimestamp(),
         userId,
     });
-
+    
+    revalidatePath('/chat');
     return assistantResponse;
 
   } catch (error) {
