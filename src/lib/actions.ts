@@ -33,6 +33,12 @@ const NewEntrySchema = z.object({
   userId: z.string().min(1, 'User ID is required.'),
 });
 
+const DeleteEntrySchema = z.object({
+    entryId: z.string().min(1, 'Entry ID is required.'),
+    userId: z.string().min(1, 'User ID is required.'),
+});
+
+
 // --------------------
 // Journal entry creation
 // --------------------
@@ -72,6 +78,32 @@ export async function createJournalEntry(prevState: any, formData: FormData) {
     return { message: `Error saving to database: ${errorMessage}`, success: false };
   }
 }
+
+// --------------------
+// Journal entry deletion
+// --------------------
+export async function deleteJournalEntry(userId: string, entryId: string): Promise<{ success: boolean; message?: string }> {
+    const validatedFields = DeleteEntrySchema.safeParse({ userId, entryId });
+
+    if (!validatedFields.success) {
+        return { success: false, message: 'Invalid IDs provided.' };
+    }
+
+    try {
+        const adminDb = getAdminApp().firestore();
+        const entryRef = adminDb.doc(`users/${userId}/journalEntries/${entryId}`);
+        await entryRef.delete();
+
+        revalidatePath('/journal');
+        revalidatePath('/dashboard');
+        return { success: true, message: 'Journal entry deleted.' };
+    } catch (error) {
+        console.error('Error deleting journal entry:', error);
+        const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+        return { success: false, message };
+    }
+}
+
 
 // --------------------
 // Chat message posting
