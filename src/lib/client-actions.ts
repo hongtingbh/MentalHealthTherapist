@@ -29,12 +29,16 @@ export async function deleteJournalEntryClient(userId: string, entryId: string) 
  * @param path Optional storage path (e.g. "users/{userId}/uploads")
  * @returns The download URL for the uploaded file
  */
-export async function uploadFileToFirebase(file: File, path: string) {
-  const storage = getStorage(getApp());
-  const fileRef = ref(storage, `${path}/${Date.now()}-${file.name}`);
-  const snapshot = await uploadBytes(fileRef, file);
-  const url = await getDownloadURL(snapshot.ref);
-  return { success: true, url, mimeType: file.type };
+export async function uploadFileToFirebase(file: File, path: string): Promise<{ success: true; url: string; mimeType: string } | { success: false; message: string }> {
+  try {
+    const storage = getStorage(getApp());
+    const fileRef = ref(storage, `${path}/${Date.now()}-${file.name}`);
+    const snapshot = await uploadBytes(fileRef, file);
+    const url = await getDownloadURL(snapshot.ref);
+    return { success: true, url, mimeType: file.type };
+  } catch (error) {
+    console.error("File upload error:", error);
+    const message = error instanceof Error ? error.message : "Failed to upload file.";
+    return { success: false, message };
+  }
 }
-
-
