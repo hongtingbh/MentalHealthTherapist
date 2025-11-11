@@ -8,8 +8,7 @@ import {
   Paperclip,
   Send,
   Loader2,
-  AlertTriangle,
-  File as FileIcon,
+  FileIcon,
   X,
   Sparkles
 } from 'lucide-react';
@@ -18,7 +17,6 @@ import { postChatMessage } from '@/lib/actions';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import Image from 'next/image';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
@@ -37,6 +35,7 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
   const [messages, setMessages] = useState<ChatMessage[]>([assistantWelcomeMessage]);
   const [input, setInput] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -91,28 +90,31 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
     setInput('');
     setFile(null);
 
-    let mediaUrl: string | undefined = undefined;
-
+    // Handle file upload separately
     if (userMessageFile) {
-      startTransition(async () => {
-        try {
-            const firebaseApp = getApp();
-            const storage = getStorage(firebaseApp);
-            const filePath = `users/${user.uid}/uploads/${sessionId}/${Date.now()}-${userMessageFile.name}`;
-            const fileRef = storageRef(storage, filePath);
-            
-            await uploadBytes(fileRef, userMessageFile);
-            mediaUrl = await getDownloadURL(fileRef);
+      setIsUploading(true);
+      try {
+        const firebaseApp = getApp();
+        const storage = getStorage(firebaseApp);
+        const filePath = `users/${user.uid}/uploads/${sessionId}/${Date.now()}-${userMessageFile.name}`;
+        const fileRef = storageRef(storage, filePath);
+        
+        await uploadBytes(fileRef, userMessageFile);
+        const mediaUrl = await getDownloadURL(fileRef);
 
-            // Now post the message after getting the URL
-            await postChatMessage(user.uid, sessionId, userMessageText, mediaUrl);
+        // Now post the message with the URL
+        startTransition(async () => {
+          await postChatMessage(user.uid, sessionId, userMessageText, mediaUrl);
+        });
 
-        } catch (error) {
-            console.error("Error uploading file or posting message:", error);
-            toast({ title: "Action Failed", description: "Could not upload your file or send the message.", variant: "destructive" });
-        }
-      });
+      } catch (error) {
+        console.error("Error uploading file or posting message:", error);
+        toast({ title: "Action Failed", description: "Could not upload your file or send the message.", variant: "destructive" });
+      } finally {
+        setIsUploading(false);
+      }
     } else {
+       // Handle text-only message
        startTransition(async () => {
          try {
             await postChatMessage(user.uid, sessionId, userMessageText);
@@ -142,9 +144,11 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
 
             {msg.mediaUrl && (
                 <div className="mt-2">
-                    {msg.mediaMimeType?.startsWith('image/') || msg.mediaUrl.includes('image') ? (
+                    {msg.mediaMimeType?.startsWith('image/') || msg.mediaUrl.includes('.png') || msg.mediaUrl.includes('.jpg') || msg.mediaUrl.includes('.jpeg') || msg.mediaUrl.includes('image') ? (
                         <Image src={msg.mediaUrl} alt="Uploaded content" width={200} height={200} className="rounded-lg object-cover" />
-                    ) : (
+                    ) : msg.mediaMimeType?.startsWith('video/') || msg.mediaUrl.includes('.mp4') || msg.mediaUrl.includes('video') ? (
+                        <video src={msg.mediaUrl} width="200" controls className="rounded-lg" />
+                    ): (
                         <div className="p-2 bg-background/50 rounded-lg text-sm">
                             <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
                                 <FileIcon size={16} />
@@ -165,6 +169,8 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
     );
   };
 
+  const isSending = isPending || isUploading;
+
   return (
     <div className="flex flex-col h-full">
        <div className="p-4 border-b bg-background">
@@ -174,7 +180,7 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
         {messages.map((msg, index) => (
           <Message key={msg.id || index} msg={msg} />
         ))}
-        {isPending && (
+        {isSending && (
           <div className="flex items-start gap-4 justify-end">
             <div className="max-w-md rounded-lg p-3 bg-primary text-primary-foreground flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin"/>
@@ -193,11 +199,11 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
           {file && (
             <div className="absolute bottom-full left-0 right-0 p-2 bg-muted border-t border-x rounded-t-lg">
                 <div className="flex items-center justify-between bg-background p-2 rounded">
-                    <div className="flex items-center gap-2 text-sm">
+                    <div className="flex items-center gap-2 text-sm truncate">
                         <FileIcon size={16} />
-                        <span>{file.name}</span>
+                        <span className="truncate">{file.name}</span>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setFile(null)}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => setFile(null)}>
                         <X size={16} />
                     </Button>
                 </div>
@@ -216,11 +222,11 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
             }}
           />
           <div className="absolute top-3 right-3 flex gap-2">
-            <Button type="button" size="icon" variant="ghost" onClick={() => fileInputRef.current?.click()}>
+            <Button type="button" size="icon" variant="ghost" onClick={() => fileInputRef.current?.click()} disabled={isSending}>
               <Paperclip className="w-5 h-5" />
             </Button>
             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept="image/*,audio/*,video/*" />
-            <Button type="submit" size="icon" disabled={(!input.trim() && !file) || isPending}>
+            <Button type="submit" size="icon" disabled={(!input.trim() && !file) || isSending}>
               <Send className="w-5 h-5" />
             </Button>
           </div>
