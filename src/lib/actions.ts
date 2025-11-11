@@ -10,9 +10,21 @@ function getAdminApp() {
     if (admin.apps.length > 0) {
       return admin.app();
     }
-    // Initialize with application default credentials for the server environment
-    const cert = admin.credential.applicationDefault()
-    return admin.initializeApp({ credential: cert });
+    
+    // Check if the service account key is available in the environment
+    // This is the standard way ADC works in many environments
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        return admin.initializeApp({
+            credential: admin.credential.applicationDefault(),
+        });
+    }
+
+    // Fallback for environments where ADC isn't set up automatically
+    // (like some local development setups).
+    // Note: This relies on you setting up a service account and the
+    // GOOGLE_APPLICATION_CREDENTIALS environment variable.
+    console.warn("GOOGLE_APPLICATION_CREDENTIALS environment variable not set. Using default credentials.");
+    return admin.initializeApp();
 }
 
 // --------------------
@@ -108,14 +120,17 @@ export async function postChatMessage(
         userMessageData.mediaUrl = mediaUrl;
     }
     
+    // Write user message to Firestore
     await adminDb.collection(messagePath).add(userMessageData);
     
+    // Simulate assistant response
     const assistantResponse: ChatMessage = {
       role: 'assistant' as const,
       id: new Date().toISOString(),
       text: "Thank you for sharing. I'm here to listen.",
     };
 
+    // Write assistant message to Firestore
     await adminDb.collection(messagePath).add({
       text: assistantResponse.text,
       role: 'assistant',

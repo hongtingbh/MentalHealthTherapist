@@ -23,6 +23,7 @@ import { collection, query, orderBy } from 'firebase/firestore';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getApp } from 'firebase/app';
 
+
 const userAvatar = PlaceHolderImages.find((p) => p.id === 'user-avatar');
 
 const assistantWelcomeMessage: ChatMessage = {
