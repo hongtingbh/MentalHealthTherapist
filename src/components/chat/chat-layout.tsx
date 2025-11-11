@@ -79,14 +79,6 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (selectedFile) {
-        if(selectedFile.size > 4 * 1024 * 1024){
-            toast({
-                title: 'File too large',
-                description: 'Please upload a file smaller than 4MB.',
-                variant: 'destructive'
-            })
-            return;
-        }
       setFile(selectedFile);
     }
   };
