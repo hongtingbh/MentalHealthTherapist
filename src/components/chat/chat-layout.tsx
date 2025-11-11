@@ -30,7 +30,6 @@ const assistantWelcomeMessage: ChatMessage = {
 
 export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sessionName: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([assistantWelcomeMessage]);
-  const [file, setFile] = useState<File | null>(null);
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -50,7 +49,12 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
 
   useEffect(() => {
     if (initialMessages) {
-      setMessages([assistantWelcomeMessage, ...initialMessages]);
+      // Avoid adding the welcome message if there are already messages from the DB
+      if (initialMessages.length > 0) {
+        setMessages(initialMessages);
+      } else {
+        setMessages([assistantWelcomeMessage]);
+      }
     }
   }, [initialMessages]);
 
@@ -59,8 +63,10 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
   }, [messages]);
 
 
-  const handleSubmit = async () => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
+
     if (!user) {
       toast({ title: 'Not logged in', description: 'You must be logged in to chat.' });
       return;
@@ -69,6 +75,7 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
     setIsSending(true);
 
     try {
+      // 1. Upload file to Firebase Storage
       const uploadResult = await uploadFileToFirebase(
         file,
         `users/${user.uid}/uploads/${sessionId}`
@@ -77,8 +84,9 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
       if (!uploadResult.success) {
         throw new Error(uploadResult.message || 'File upload failed');
       }
-      
-      await postChatMessage(user.uid, sessionId, undefined, uploadResult.url);
+
+      // 2. Call the server action with the file URL
+      await postChatMessage(user.uid, sessionId, uploadResult.url);
 
     } catch (error: any) {
       console.error('Error sending file:', error);
@@ -89,26 +97,12 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
       });
     } finally {
       setIsSending(false);
-      setFile(null);
+      // Reset the file input so the same file can be selected again
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
   };
-  
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-        setFile(selectedFile);
-    }
-  };
-  
-  useEffect(() => {
-    if (file) {
-      handleSubmit();
-    }
-  }, [file]);
-
 
   const Message = ({ msg }: { msg: ChatMessage }) => {
     const isAssistant = msg.role === 'assistant';
@@ -180,13 +174,13 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
         {messages.map((msg, i) => (
           <Message key={msg.id || i} msg={msg} />
         ))}
-        {isSending && file && (
+         {isSending && (
           <div className="flex items-start gap-4 justify-end">
             <div className="max-w-md rounded-lg p-3 bg-primary text-primary-foreground flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm truncate">Sending {file.name}...</span>
+              <span className="text-sm">Sending...</span>
             </div>
-            <Avatar className="h-8 w-8">
+             <Avatar className="h-8 w-8">
               <AvatarImage src={user?.photoURL || userAvatar?.imageUrl} />
               <AvatarFallback>U</AvatarFallback>
             </Avatar>
@@ -203,15 +197,24 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
               disabled={isSending}
               size="lg"
             >
-              <Paperclip className="w-5 h-5 mr-2" />
-              {isSending ? 'Uploading...' : 'Upload a File'}
+              {isSending ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  <span>Sending...</span>
+                </>
+              ) : (
+                <>
+                  <Paperclip className="w-5 h-5 mr-2" />
+                  <span>Upload a File</span>
+                </>
+              )}
             </Button>
             <input
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
               className="hidden"
-              accept="image/*,audio/*,video/*"
+              accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.txt"
               disabled={isSending}
             />
         </div>
