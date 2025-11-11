@@ -2,6 +2,7 @@
 
 import { getFirestore, doc, deleteDoc } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 /**
  * Deletes a journal entry using the client Firestore SDK.
@@ -20,3 +21,20 @@ export async function deleteJournalEntryClient(userId: string, entryId: string) 
     return { success: false, message };
   }
 }
+
+/**
+ * Uploads a file to Firebase Cloud Storage and returns its download URL.
+ * 
+ * @param file The file to upload (from an <input type="file"> or File object)
+ * @param path Optional storage path (e.g. "users/{userId}/uploads")
+ * @returns The download URL for the uploaded file
+ */
+export async function uploadFileToFirebase(file: File, path: string) {
+  const storage = getStorage(getApp());
+  const fileRef = ref(storage, `${path}/${Date.now()}-${file.name}`);
+  const snapshot = await uploadBytes(fileRef, file);
+  const url = await getDownloadURL(snapshot.ref);
+  return { success: true, url, mimeType: file.type };
+}
+
+
