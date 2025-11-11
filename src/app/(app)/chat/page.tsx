@@ -4,12 +4,12 @@ import { ChatLayout } from '@/components/chat/chat-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { PlusCircle, MessageSquare, Trash2 } from 'lucide-react';
+import { PlusCircle, MessageSquare, Trash2, Pencil } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Sparkles } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp, query, orderBy, getDocs, limit, getCountFromServer } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, getCountFromServer } from 'firebase/firestore';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +22,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useToast } from '@/hooks/use-toast';
-import { deleteChatSession } from '@/lib/actions';
+import { deleteChatSession, renameChatSession } from '@/lib/actions';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 
 export default function ChatPage() {
@@ -31,6 +33,8 @@ export default function ChatPage() {
   const { toast } = useToast();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [tempSessionName, setTempSessionName] = useState('');
   const isCreatingSession = useRef(false);
 
   const sessionsQuery = useMemoFirebase(() => {
@@ -40,12 +44,14 @@ export default function ChatPage() {
 
   const { data: sessions, isLoading: sessionsLoading } = useCollection(sessionsQuery);
 
+  const activeSession = sessions?.find(s => s.id === activeSessionId);
+
   const handleNewSession = async () => {
-    if (!user || !firestore || isCreatingSession.current) return;
+    if (!user || !firestore || isCreatingSession.current || !sessionsQuery) return;
     
     isCreatingSession.current = true;
     try {
-        const sessionCountSnapshot = await getCountFromServer(sessionsQuery!);
+        const sessionCountSnapshot = await getCountFromServer(sessionsQuery);
         const sessionCount = sessionCountSnapshot.data().count;
 
         const newSessionRef = await addDoc(collection(firestore, `users/${user.uid}/sessions`), {
@@ -62,22 +68,16 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    // This effect runs when sessions are loaded or change.
-    if (sessionsLoading || !user || !firestore) {
-      // Still loading, do nothing.
-      return;
-    }
+    if (sessionsLoading) return;
 
     if (sessions && sessions.length > 0) {
-      // Sessions exist. Select the first one if none is active.
       if (activeSessionId === null) {
-        setActiveSessionId(sessions[0].id);
+        setActiveSessionId(sessions[sessions.length - 1].id);
       }
-    } else if (sessions && sessions.length === 0) {
-      // No sessions exist, create the first one.
+    } else if (user && sessions && sessions.length === 0) {
       handleNewSession();
     }
-  }, [sessions, sessionsLoading, user, firestore]);
+  }, [sessions, sessionsLoading, user, activeSessionId]);
 
 
   const selectSession = (sessionId: string) => {
@@ -91,7 +91,6 @@ export default function ChatPage() {
 
     if (result.success) {
       toast({ title: "Session deleted", description: "The session has been removed." });
-       // If the deleted session was the active one, select another one
        if (activeSessionId === sessionToDelete) {
          const remainingSessions = sessions?.filter(s => s.id !== sessionToDelete);
          setActiveSessionId(remainingSessions && remainingSessions.length > 0 ? remainingSessions[0].id : null);
@@ -101,6 +100,25 @@ export default function ChatPage() {
     }
     setSessionToDelete(null);
   };
+
+  const handleRename = (session: { id: string; name: string }) => {
+    setEditingSessionId(session.id);
+    setTempSessionName(session.name);
+  };
+
+  const handleRenameSubmit = async () => {
+    if (!editingSessionId || !user) return;
+
+    const result = await renameChatSession(user.uid, editingSessionId, tempSessionName);
+
+    if (result.success) {
+      toast({ title: "Session renamed" });
+    } else {
+      toast({ title: "Error", description: result.message, variant: 'destructive' });
+      // Optionally, revert the name in the UI
+    }
+    setEditingSessionId(null);
+  };
   
   const canDelete = sessions ? sessions.length > 1 : false;
 
@@ -109,7 +127,11 @@ export default function ChatPage() {
         <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
         <div className="h-full flex flex-col rounded-lg border">
             {activeSessionId ? (
-                <ChatLayout sessionId={activeSessionId} key={activeSessionId} />
+                <ChatLayout 
+                  sessionId={activeSessionId} 
+                  sessionName={activeSession?.name || ''} 
+                  key={activeSessionId} 
+                />
             ) : (
             <div className="flex items-center justify-center h-full">
                 <p>Loading or creating session...</p>
@@ -144,31 +166,51 @@ export default function ChatPage() {
                 <ScrollArea className="flex-grow">
                     <div className="flex flex-col gap-2">
                         {sessionsLoading ? <p>Loading sessions...</p> : sessions?.map((session) => (
-                            <div key={session.id} className="flex items-center gap-2 group">
-                                <Button 
-                                    variant={activeSessionId === session.id ? 'secondary' : 'ghost'} 
-                                    className="justify-start flex-grow w-0"
-                                    onClick={() => selectSession(session.id)}
-                                >
-                                    <MessageSquare className="mr-2 h-4 w-4 flex-shrink-0" />
-                                    <span className="truncate">{session.name || `Session ${session.id.substring(0, 4)}`}</span>
-                                </Button>
-                                <AlertDialogTrigger asChild>
+                            <div key={session.id} className="flex items-center gap-1 group">
+                                {editingSessionId === session.id ? (
+                                    <Input
+                                        value={tempSessionName}
+                                        onChange={(e) => setTempSessionName(e.target.value)}
+                                        onBlur={handleRenameSubmit}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleRenameSubmit()}
+                                        autoFocus
+                                        className="h-9 flex-grow"
+                                    />
+                                ) : (
+                                  <>
+                                    <Button 
+                                        variant={activeSessionId === session.id ? 'secondary' : 'ghost'} 
+                                        className="justify-start flex-grow w-0"
+                                        onClick={() => selectSession(session.id)}
+                                    >
+                                        <MessageSquare className="mr-2 h-4 w-4 flex-shrink-0" />
+                                        <span className="truncate">{session.name || `Session ${session.id.substring(0, 4)}`}</span>
+                                    </Button>
                                     <Button 
                                         variant="ghost" 
                                         size="icon" 
-                                        className="h-8 w-8 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
-                                        disabled={!canDelete}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (canDelete) {
-                                                setSessionToDelete(session.id);
-                                            }
-                                        }}
+                                        className="h-8 w-8 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity"
+                                        onClick={() => handleRename(session)}
                                     >
-                                        <Trash2 className="h-4 w-4" />
+                                        <Pencil className="h-4 w-4" />
                                     </Button>
-                                </AlertDialogTrigger>
+                                    <AlertDialogTrigger asChild>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="h-8 w-8 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
+                                            disabled={!canDelete}
+                                            onClick={(e) => {
+                                                if (canDelete) {
+                                                    setSessionToDelete(session.id);
+                                                }
+                                            }}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                  </>
+                                )}
                             </div>
                         ))}
                     </div>

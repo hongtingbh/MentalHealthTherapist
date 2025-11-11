@@ -19,7 +19,6 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Badge } from '../ui/badge';
 import Image from 'next/image';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
@@ -41,7 +40,7 @@ const fileToDataURL = (file: File): Promise<string> => {
     });
 };
 
-export function ChatLayout({ sessionId }: { sessionId: string }) {
+export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sessionName: string; }) {
   const [messages, setMessages] = useState<ChatMessage[]>([assistantWelcomeMessage]);
   const [input, setInput] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -177,6 +176,9 @@ export function ChatLayout({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="flex flex-col h-full">
+       <div className="p-4 border-b bg-background">
+        <h2 className="text-xl font-semibold truncate">{sessionName}</h2>
+      </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         {messages.map((msg, index) => (
           <Message key={msg.id || index} msg={msg} />

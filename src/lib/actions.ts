@@ -4,7 +4,6 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { JournalEntry, Mood, ChatMessage } from './definitions';
 import admin from 'firebase-admin';
-import { GoogleAuth } from 'google-auth-library';
 
 // Helper to get the initialized Firebase Admin App
 function getAdminApp() {
@@ -143,10 +142,11 @@ export async function deleteChatSession(
     const adminDb = getAdminApp().firestore();
     const sessionRef = adminDb.doc(`users/${userId}/sessions/${sessionId}`);
     
+    const messagesSnapshot = await adminDb.collection(`users/${userId}/sessions/${sessionId}/messages`).get();
+    
     // Use a batch to delete the session and its messages subcollection
     const batch = adminDb.batch();
     
-    const messagesSnapshot = await adminDb.collection(`users/${userId}/sessions/${sessionId}/messages`).get();
     if (!messagesSnapshot.empty) {
         messagesSnapshot.docs.forEach(doc => {
             batch.delete(doc.ref);
@@ -160,6 +160,35 @@ export async function deleteChatSession(
     return { success: true };
   } catch (error) {
     console.error('Error deleting chat session:', error);
+    const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+    return { success: false, message };
+  }
+}
+
+
+// --------------------
+// Rename a session
+// --------------------
+export async function renameChatSession(
+  userId: string,
+  sessionId: string,
+  newName: string
+): Promise<{ success: boolean; message?: string }> {
+  const schema = z.string().min(1, "Name cannot be empty").max(50, "Name is too long");
+  const validation = schema.safeParse(newName);
+
+  if (!validation.success) {
+    return { success: false, message: validation.error.errors[0].message };
+  }
+  
+  try {
+    const adminDb = getAdminApp().firestore();
+    const sessionRef = adminDb.doc(`users/${userId}/sessions/${sessionId}`);
+    await sessionRef.update({ name: newName });
+    revalidatePath('/chat');
+    return { success: true };
+  } catch (error) {
+    console.error('Error renaming chat session:', error);
     const message = error instanceof Error ? error.message : 'An unknown error occurred.';
     return { success: false, message };
   }
