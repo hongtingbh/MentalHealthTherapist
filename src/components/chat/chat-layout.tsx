@@ -164,16 +164,6 @@ export function ChatLayout({ sessionId }: { sessionId: string }) {
                     )}
                 </div>
             )}
-            {msg.classification && (
-                <div className="mt-4 border-t pt-2">
-                    <h4 className="text-xs font-semibold mb-2">Symptom Analysis</h4>
-                    <div className="flex flex-wrap gap-1">
-                        {msg.classification.ptsdSymptoms.slice(0,2).map(s => <Badge key={s} variant="secondary">PTSD: {s}</Badge>)}
-                        {msg.classification.gadSymptoms.slice(0,2).map(s => <Badge key={s} variant="secondary">GAD: {s}</Badge>)}
-                        {msg.classification.mmdSymptoms.slice(0,2).map(s => <Badge key={s} variant="secondary">MMD: {s}</Badge>)}
-                    </div>
-                </div>
-            )}
         </div>
         {!isAssistant && (
              <Avatar className="h-8 w-8">

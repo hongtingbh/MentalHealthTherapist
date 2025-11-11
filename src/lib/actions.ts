@@ -2,8 +2,6 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { detectSelfHarm } from '@/ai/flows/detect-potential-self-harm';
-import { classifyMoodDisorders } from '@/ai/flows/classify-mood-disorders';
 import { JournalEntry, Mood, ChatMessage } from './definitions';
 import admin from 'firebase-admin';
 import { GoogleAuth } from 'google-auth-library';
@@ -13,10 +11,8 @@ function getAdminApp() {
   if (admin.apps.length > 0) {
     return admin.app();
   }
-  // Initialize the Admin SDK with Application Default Credentials
-  return admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
-  });
+  // Initialize with application default credentials
+  return admin.initializeApp();
 }
 
 // --------------------
@@ -109,43 +105,16 @@ export async function postChatMessage(
       userId,
     };
     await adminDb.collection(messagePath).add(userMessageData);
-
-    const selfHarmCheck = await detectSelfHarm({ text: message });
-    if (selfHarmCheck.selfHarmDetected) {
-      const assistantMessage: ChatMessage = {
-        role: 'assistant' as const,
-        id: new Date().toISOString(),
-        selfHarmWarning: selfHarmCheck.guidance,
-        text:
-          'It sounds like you are going through a difficult time. Please consider reaching out for professional help.',
-      };
-      await adminDb.collection(messagePath).add({
-        ...assistantMessage,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        userId,
-      });
-      revalidatePath('/chat');
-      return assistantMessage;
-    }
-
-    const classification = await classifyMoodDisorders({ message, mediaDataUri });
-
+    
     const assistantResponse: ChatMessage = {
       role: 'assistant' as const,
       id: new Date().toISOString(),
-      text: classification.summary,
-      classification: {
-        ptsdSymptoms: classification.ptsdSymptoms,
-        gadSymptoms: classification.gadSymptoms,
-        mmdSymptoms: classification.mmdSymptoms,
-        summary: classification.summary,
-      },
+      text: "Thank you for sharing. I'm here to listen.",
     };
 
     await adminDb.collection(messagePath).add({
       text: assistantResponse.text,
       role: 'assistant',
-      classification: assistantResponse.classification,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       userId,
     });
