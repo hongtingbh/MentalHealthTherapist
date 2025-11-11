@@ -5,6 +5,7 @@ import { collection } from 'firebase/firestore';
 import { JournalList } from "@/components/journal/journal-list";
 import { NewJournalEntry } from "@/components/journal/new-journal-entry";
 
+
 export default function JournalPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();

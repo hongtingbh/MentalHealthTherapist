@@ -6,21 +6,18 @@ import { detectSelfHarm } from '@/ai/flows/detect-potential-self-harm';
 import { classifyMoodDisorders } from '@/ai/flows/classify-mood-disorders';
 import { JournalEntry, Mood, ChatMessage } from './definitions';
 
-// ✅ Use Firestore client SDK
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  serverTimestamp,
-} from 'firebase/firestore';
+// ✅ Use Firestore client SDK for some ops, but Admin for mutations
+import { getFirestore, collection, addDoc, serverTimestamp, } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
 import admin from 'firebase-admin';
 
 // Helper to get the initialized Firebase Admin App
 function getAdminApp() {
-  if (admin.apps.length) {
+  if (admin.apps.length > 0) {
     return admin.app();
   }
+  // This automatically uses GOOGLE_APPLICATION_CREDENTIALS
+  // on the server, which is the correct way for App Hosting.
   return admin.initializeApp();
 }
 
@@ -60,9 +57,9 @@ export async function createJournalEntry(prevState: any, formData: FormData) {
   const { content, mood, userId } = validatedFields.data;
 
   try {
-    const db = getFirestore(getApp());
-    await addDoc(collection(db, `users/${userId}/journalEntries`), {
-      createdAt: serverTimestamp(),
+    const adminDb = getAdminApp().firestore();
+    await adminDb.collection(`users/${userId}/journalEntries`).add({
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
       mood: mood as Mood,
       content,
       userId,
@@ -115,17 +112,17 @@ export async function postChatMessage(
   mediaDataUri?: string
 ): Promise<ChatMessage> {
   try {
-    const db = getFirestore(getApp());
+    const adminDb = getAdminApp().firestore();
     const messagePath = `users/${userId}/sessions/${sessionId}/messages`;
 
     const userMessageData = {
       role: 'user',
       text: message,
       ...(mediaDataUri && { mediaUrl: mediaDataUri }),
-      timestamp: serverTimestamp(),
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
       userId,
     };
-    await addDoc(collection(db, messagePath), userMessageData);
+    await adminDb.collection(messagePath).add(userMessageData);
 
     const selfHarmCheck = await detectSelfHarm({ text: message });
     if (selfHarmCheck.selfHarmDetected) {
@@ -136,9 +133,9 @@ export async function postChatMessage(
         text:
           'It sounds like you are going through a difficult time. Please consider reaching out for professional help.',
       };
-      await addDoc(collection(db, messagePath), {
+      await adminDb.collection(messagePath).add({
         ...assistantMessage,
-        timestamp: serverTimestamp(),
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
         userId,
       });
       revalidatePath('/chat');
@@ -159,11 +156,11 @@ export async function postChatMessage(
       },
     };
 
-    await addDoc(collection(db, messagePath), {
+    await adminDb.collection(messagePath).add({
       text: assistantResponse.text,
       role: 'assistant',
       classification: assistantResponse.classification,
-      timestamp: serverTimestamp(),
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
       userId,
     });
 
