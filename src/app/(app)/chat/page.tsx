@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Sparkles } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, getDocs, limit, getCountFromServer } from 'firebase/firestore';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,37 +45,39 @@ export default function ChatPage() {
     
     isCreatingSession.current = true;
     try {
-        // To prevent race conditions, fetch the current count directly
-        const sessionsSnapshot = await getDocs(sessionsQuery!);
-        const sessionCount = sessionsSnapshot.size;
+        const sessionCountSnapshot = await getCountFromServer(sessionsQuery!);
+        const sessionCount = sessionCountSnapshot.data().count;
 
         const newSessionRef = await addDoc(collection(firestore, `users/${user.uid}/sessions`), {
-        createdAt: serverTimestamp(),
-        name: `Session ${sessionCount + 1}`
+          createdAt: serverTimestamp(),
+          name: `Session ${sessionCount + 1}`
         });
         setActiveSessionId(newSessionRef.id);
     } catch (error) {
         console.error("Failed to create new session:", error);
+        toast({ title: 'Error', description: 'Could not create a new session.', variant: 'destructive' });
     } finally {
         isCreatingSession.current = false;
     }
   };
 
   useEffect(() => {
-    if (!sessionsLoading && user && firestore) {
-      if (!sessions || sessions.length === 0) {
-        if (!activeSessionId) { 
-          handleNewSession();
-        }
-      } else {
-        const sessionIds = sessions.map(s => s.id);
-        if (activeSessionId === null || !sessionIds.includes(activeSessionId)) {
-          // Default to the first session if the active one is not set or invalid
-          setActiveSessionId(sessions[0].id);
-        }
-      }
+    // This effect runs when sessions are loaded or change.
+    if (sessionsLoading || !user || !firestore) {
+      // Still loading, do nothing.
+      return;
     }
-  }, [sessions, sessionsLoading, user, firestore]); 
+
+    if (sessions && sessions.length > 0) {
+      // Sessions exist. Select the first one if none is active.
+      if (activeSessionId === null) {
+        setActiveSessionId(sessions[0].id);
+      }
+    } else if (sessions && sessions.length === 0) {
+      // No sessions exist, create the first one.
+      handleNewSession();
+    }
+  }, [sessions, sessionsLoading, user, firestore]);
 
 
   const selectSession = (sessionId: string) => {
@@ -89,6 +91,11 @@ export default function ChatPage() {
 
     if (result.success) {
       toast({ title: "Session deleted", description: "The session has been removed." });
+       // If the deleted session was the active one, select another one
+       if (activeSessionId === sessionToDelete) {
+         const remainingSessions = sessions?.filter(s => s.id !== sessionToDelete);
+         setActiveSessionId(remainingSessions && remainingSessions.length > 0 ? remainingSessions[0].id : null);
+       }
     } else {
       toast({ title: "Error", description: result.message, variant: 'destructive' });
     }
