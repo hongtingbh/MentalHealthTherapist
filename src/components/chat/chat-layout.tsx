@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -34,8 +34,7 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
   const [messages, setMessages] = useState<ChatMessage[]>([assistantWelcomeMessage]);
   const [input, setInput] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -80,6 +79,8 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
       toast({ title: "Not logged in", description: "You must be logged in to chat."});
       return;
     }
+    
+    setIsSending(true);
 
     const userMessageText = input;
     const userMessageFile = file;
@@ -87,46 +88,30 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
     setInput('');
     setFile(null);
 
-    if (userMessageFile) {
-      setIsUploading(true);
-      try {
-        const uploadResult = await uploadFileToFirebase(
-          userMessageFile,
-          `users/${user.uid}/uploads/${sessionId}`
-        );
+    try {
+      let uploadUrl: string | undefined = undefined;
 
-        if (!uploadResult.success) throw new Error(uploadResult.message);
-        
-        await postChatMessage(
-          user.uid,
-          sessionId,
-          userMessageText,
-          uploadResult.url
-        );
+      if (userMessageFile) {
+          const uploadResult = await uploadFileToFirebase(
+            userMessageFile,
+            `users/${user.uid}/uploads/${sessionId}`
+          );
 
-      } catch (error) {
-        console.error("Error uploading file or posting message:", error);
+          if (!uploadResult.success) throw new Error(uploadResult.message);
+          uploadUrl = uploadResult.url;
+      }
+      
+      await postChatMessage(user.uid, sessionId, userMessageText, uploadUrl);
+
+    } catch (error) {
+        console.error("Error sending message:", error);
         toast({
           title: "Action Failed",
-          description: "Could not upload your file or send the message.",
+          description: "Could not send the message.",
           variant: "destructive",
         });
-      } finally {
-        setIsUploading(false);
-      }
-    } else {
-      startTransition(async () => {
-        try {
-          await postChatMessage(user.uid, sessionId, userMessageText);
-        } catch (error) {
-          console.error("Error posting message:", error);
-          toast({
-            title: "Message Failed",
-            description: "Could not send the message.",
-            variant: "destructive",
-          });
-        }
-      });
+    } finally {
+        setIsSending(false);
     }
   };
 
@@ -173,8 +158,6 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
       </div>
     );
   };
-
-  const isSending = isPending || isUploading;
 
   return (
     <div className="flex flex-col h-full">
