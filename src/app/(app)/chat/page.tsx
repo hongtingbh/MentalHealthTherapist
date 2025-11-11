@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { PlusCircle, MessageSquare, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Sparkles } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp, query, orderBy, getDocs } from 'firebase/firestore';
 import {
@@ -31,6 +31,7 @@ export default function ChatPage() {
   const { toast } = useToast();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const isCreatingSession = useRef(false);
 
   const sessionsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -40,17 +41,24 @@ export default function ChatPage() {
   const { data: sessions, isLoading: sessionsLoading } = useCollection(sessionsQuery);
 
   const handleNewSession = async () => {
-    if (!user || !firestore) return;
+    if (!user || !firestore || isCreatingSession.current) return;
+    
+    isCreatingSession.current = true;
+    try {
+        // To prevent race conditions, fetch the current count directly
+        const sessionsSnapshot = await getDocs(sessionsQuery!);
+        const sessionCount = sessionsSnapshot.size;
 
-    // To prevent race conditions, fetch the current count directly
-    const sessionsSnapshot = await getDocs(sessionsQuery!);
-    const sessionCount = sessionsSnapshot.size;
-
-    const newSessionRef = await addDoc(collection(firestore, `users/${user.uid}/sessions`), {
-      createdAt: serverTimestamp(),
-      name: `Session ${sessionCount + 1}`
-    });
-    setActiveSessionId(newSessionRef.id);
+        const newSessionRef = await addDoc(collection(firestore, `users/${user.uid}/sessions`), {
+        createdAt: serverTimestamp(),
+        name: `Session ${sessionCount + 1}`
+        });
+        setActiveSessionId(newSessionRef.id);
+    } catch (error) {
+        console.error("Failed to create new session:", error);
+    } finally {
+        isCreatingSession.current = false;
+    }
   };
 
   useEffect(() => {
@@ -62,11 +70,12 @@ export default function ChatPage() {
       } else {
         const sessionIds = sessions.map(s => s.id);
         if (activeSessionId === null || !sessionIds.includes(activeSessionId)) {
+          // Default to the first session if the active one is not set or invalid
           setActiveSessionId(sessions[0].id);
         }
       }
     }
-  }, [sessions, sessionsLoading, user, firestore, activeSessionId]); 
+  }, [sessions, sessionsLoading, user, firestore]); 
 
 
   const selectSession = (sessionId: string) => {
