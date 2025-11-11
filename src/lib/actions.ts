@@ -7,11 +7,12 @@ import admin from 'firebase-admin';
 
 // Helper to get the initialized Firebase Admin App
 function getAdminApp() {
-  if (admin.apps.length > 0) {
-    return admin.app();
-  }
-  // Initialize with application default credentials for the server environment
-  return admin.initializeApp();
+    if (admin.apps.length > 0) {
+      return admin.app();
+    }
+    // Initialize with application default credentials for the server environment
+    const cert = admin.credential.applicationDefault()
+    return admin.initializeApp({ credential: cert });
 }
 
 // --------------------
@@ -91,7 +92,7 @@ export async function postChatMessage(
   sessionId: string,
   message: string,
   mediaUrl?: string
-): Promise<ChatMessage> {
+): Promise<void> {
   try {
     const adminDb = getAdminApp().firestore();
     const messagePath = `users/${userId}/sessions/${sessionId}/messages`;
@@ -123,15 +124,11 @@ export async function postChatMessage(
     });
 
     revalidatePath('/chat');
-    return assistantResponse;
+    
   } catch (error) {
     console.error('Error processing chat message:', error);
-    return {
-      role: 'assistant' as const,
-      id: new Date().toISOString(),
-      text:
-        'I apologize, but I encountered an error and cannot respond right now. Please try again later.',
-    };
+    // Re-throw the error to be caught by the client transition
+    throw new Error('Failed to post chat message.');
   }
 }
 
@@ -148,7 +145,6 @@ export async function deleteChatSession(
     
     const messagesSnapshot = await adminDb.collection(`users/${userId}/sessions/${sessionId}/messages`).get();
     
-    // Use a batch to delete the session and its messages subcollection
     const batch = adminDb.batch();
     
     if (!messagesSnapshot.empty) {

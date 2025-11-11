@@ -84,40 +84,44 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
         return;
     }
 
-    const userMessage: ChatMessage = {
-      id: new Date().toISOString(),
-      role: 'user',
-      text: input,
-      ...(file && { mediaUrl: URL.createObjectURL(file), mediaMimeType: file.type }),
-    };
+    const userMessageText = input;
+    const userMessageFile = file;
 
-    setMessages((prev) => [...prev, userMessage]);
+    // Clear the input fields immediately
     setInput('');
+    setFile(null);
+
     let mediaUrl: string | undefined = undefined;
 
-    if (file) {
+    if (userMessageFile) {
+      startTransition(async () => {
         try {
             const firebaseApp = getApp();
             const storage = getStorage(firebaseApp);
-            const filePath = `users/${user.uid}/uploads/${sessionId}/${Date.now()}-${file.name}`;
+            const filePath = `users/${user.uid}/uploads/${sessionId}/${Date.now()}-${userMessageFile.name}`;
             const fileRef = storageRef(storage, filePath);
             
-            await uploadBytes(fileRef, file);
+            await uploadBytes(fileRef, userMessageFile);
             mediaUrl = await getDownloadURL(fileRef);
 
-        } catch (error) {
-            console.error("Error uploading file to Cloud Storage:", error);
-            toast({ title: "File Upload Failed", description: "Could not upload your file. Please try again.", variant: "destructive" });
-            setMessages(prev => prev.slice(0, -1)); // Remove the optimistic message
-            return;
-        }
-    }
-    setFile(null);
+            // Now post the message after getting the URL
+            await postChatMessage(user.uid, sessionId, userMessageText, mediaUrl);
 
-    startTransition(async () => {
-      const assistantResponse = await postChatMessage(user.uid, sessionId, input, mediaUrl);
-      setMessages((prev) => [...prev, assistantResponse]);
-    });
+        } catch (error) {
+            console.error("Error uploading file or posting message:", error);
+            toast({ title: "Action Failed", description: "Could not upload your file or send the message.", variant: "destructive" });
+        }
+      });
+    } else {
+       startTransition(async () => {
+         try {
+            await postChatMessage(user.uid, sessionId, userMessageText);
+         } catch(error) {
+            console.error("Error posting message:", error);
+            toast({ title: "Message Failed", description: "Could not send the message.", variant: "destructive" });
+         }
+      });
+    }
   };
 
   const Message = ({ msg }: { msg: ChatMessage }) => {
@@ -133,29 +137,18 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
         <div className={cn('max-w-md rounded-lg p-3', 
           isAssistant ? 'bg-muted' : 'bg-primary text-primary-foreground'
         )}>
-            {msg.selfHarmWarning && (
-                <Card className="mb-3 bg-destructive/20 border-destructive">
-                    <CardHeader className="p-4">
-                        <CardTitle className="flex items-center gap-2 text-destructive"><AlertTriangle size={20}/> Important</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0 text-destructive-foreground">
-                        <p className="font-semibold">{msg.text}</p>
-                        <p className="text-sm mt-2">{msg.selfHarmWarning}</p>
-                    </CardContent>
-                </Card>
-            )}
             
             {msg.text && <p className="text-sm leading-relaxed">{msg.text}</p>}
 
             {msg.mediaUrl && (
                 <div className="mt-2">
-                    {msg.mediaMimeType?.startsWith('image/') ? (
+                    {msg.mediaMimeType?.startsWith('image/') || msg.mediaUrl.includes('image') ? (
                         <Image src={msg.mediaUrl} alt="Uploaded content" width={200} height={200} className="rounded-lg object-cover" />
                     ) : (
                         <div className="p-2 bg-background/50 rounded-lg text-sm">
                             <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
                                 <FileIcon size={16} />
-                                <span>{msg.mediaMimeType}</span>
+                                <span>{msg.mediaMimeType || 'Attachment'}</span>
                             </a>
                         </div>
                     )}
@@ -182,14 +175,15 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
           <Message key={msg.id || index} msg={msg} />
         ))}
         {isPending && (
-          <div className="flex items-start gap-4">
-            <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-primary-foreground"><Sparkles className="h-5 w-5"/></AvatarFallback>
-            </Avatar>
-            <div className="max-w-md rounded-lg p-3 bg-muted flex items-center gap-2">
+          <div className="flex items-start gap-4 justify-end">
+            <div className="max-w-md rounded-lg p-3 bg-primary text-primary-foreground flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin"/>
-                <span className="text-sm text-muted-foreground">Thinking...</span>
+                <span className="text-sm">Sending...</span>
             </div>
+             <Avatar className="h-8 w-8">
+                <AvatarImage src={user?.photoURL || userAvatar?.imageUrl} />
+                <AvatarFallback>U</AvatarFallback>
+            </Avatar>
           </div>
         )}
         <div ref={bottomRef} />
