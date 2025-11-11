@@ -6,15 +6,17 @@ import { detectSelfHarm } from '@/ai/flows/detect-potential-self-harm';
 import { classifyMoodDisorders } from '@/ai/flows/classify-mood-disorders';
 import { JournalEntry, Mood, ChatMessage } from './definitions';
 import admin from 'firebase-admin';
+import { GoogleAuth } from 'google-auth-library';
 
 // Helper to get the initialized Firebase Admin App
 function getAdminApp() {
   if (admin.apps.length > 0) {
     return admin.app();
   }
-  // This automatically uses GOOGLE_APPLICATION_CREDENTIALS on the server,
-  // which is the correct way for App Hosting and other Google Cloud environments.
-  return admin.initializeApp();
+  // Initialize the Admin SDK with Application Default Credentials
+  return admin.initializeApp({
+    credential: admin.credential.applicationDefault(),
+  });
 }
 
 // --------------------
