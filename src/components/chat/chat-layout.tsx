@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useRef, useEffect, useCallback } from 'react';
+import { useState, useTransition, useRef, useEffect } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,6 +22,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import Image from 'next/image';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getApp } from 'firebase/app';
 
 const userAvatar = PlaceHolderImages.find((p) => p.id === 'user-avatar');
 
@@ -29,15 +31,6 @@ const assistantWelcomeMessage: ChatMessage = {
   id: 'welcome',
   role: 'assistant',
   text: "Hello! I'm here to listen and support you. How are you feeling today? Feel free to share what's on your mind.",
-};
-
-const fileToDataURL = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = (error) => reject(error);
-    });
 };
 
 export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sessionName: string; }) {
@@ -100,16 +93,29 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
 
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
-    let mediaDataUri: string | undefined = undefined;
+    let mediaUrl: string | undefined = undefined;
 
     if (file) {
-      mediaDataUri = await fileToDataURL(file);
+        try {
+            const firebaseApp = getApp();
+            const storage = getStorage(firebaseApp);
+            const filePath = `users/${user.uid}/uploads/${sessionId}/${Date.now()}-${file.name}`;
+            const fileRef = storageRef(storage, filePath);
+            
+            await uploadBytes(fileRef, file);
+            mediaUrl = await getDownloadURL(fileRef);
+
+        } catch (error) {
+            console.error("Error uploading file to Cloud Storage:", error);
+            toast({ title: "File Upload Failed", description: "Could not upload your file. Please try again.", variant: "destructive" });
+            setMessages(prev => prev.slice(0, -1)); // Remove the optimistic message
+            return;
+        }
     }
     setFile(null);
 
-
     startTransition(async () => {
-      const assistantResponse = await postChatMessage(user.uid, sessionId, input, mediaDataUri);
+      const assistantResponse = await postChatMessage(user.uid, sessionId, input, mediaUrl);
       setMessages((prev) => [...prev, assistantResponse]);
     });
   };

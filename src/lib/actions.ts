@@ -10,7 +10,7 @@ function getAdminApp() {
   if (admin.apps.length > 0) {
     return admin.app();
   }
-  // Initialize with application default credentials
+  // Initialize with application default credentials for the server environment
   return admin.initializeApp();
 }
 
@@ -90,19 +90,23 @@ export async function postChatMessage(
   userId: string,
   sessionId: string,
   message: string,
-  mediaDataUri?: string
+  mediaUrl?: string
 ): Promise<ChatMessage> {
   try {
     const adminDb = getAdminApp().firestore();
     const messagePath = `users/${userId}/sessions/${sessionId}/messages`;
 
-    const userMessageData = {
+    const userMessageData: { role: 'user'; text: string; mediaUrl?: string; timestamp: FirebaseFirestore.FieldValue; userId: string; } = {
       role: 'user',
       text: message,
-      ...(mediaDataUri && { mediaUrl: mediaDataUri }),
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       userId,
     };
+    
+    if (mediaUrl) {
+        userMessageData.mediaUrl = mediaUrl;
+    }
+    
     await adminDb.collection(messagePath).add(userMessageData);
     
     const assistantResponse: ChatMessage = {
