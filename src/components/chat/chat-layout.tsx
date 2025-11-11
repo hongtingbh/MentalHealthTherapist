@@ -90,7 +90,7 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
     setInput('');
     setFile(null);
 
-    // Handle file upload separately
+    // Handle file upload
     if (userMessageFile) {
       setIsUploading(true);
       try {
@@ -103,9 +103,7 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
         const mediaUrl = await getDownloadURL(fileRef);
 
         // Now post the message with the URL
-        startTransition(async () => {
-          await postChatMessage(user.uid, sessionId, userMessageText, mediaUrl);
-        });
+        await postChatMessage(user.uid, sessionId, userMessageText, mediaUrl);
 
       } catch (error) {
         console.error("Error uploading file or posting message:", error);
