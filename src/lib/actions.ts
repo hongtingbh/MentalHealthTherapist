@@ -5,10 +5,6 @@ import { z } from 'zod';
 import { detectSelfHarm } from '@/ai/flows/detect-potential-self-harm';
 import { classifyMoodDisorders } from '@/ai/flows/classify-mood-disorders';
 import { JournalEntry, Mood, ChatMessage } from './definitions';
-
-// ✅ Use Firestore client SDK for some ops, but Admin for mutations
-import { getFirestore, collection, addDoc, serverTimestamp, } from 'firebase/firestore';
-import { getApp } from 'firebase/app';
 import admin from 'firebase-admin';
 
 // Helper to get the initialized Firebase Admin App
@@ -16,8 +12,8 @@ function getAdminApp() {
   if (admin.apps.length > 0) {
     return admin.app();
   }
-  // This automatically uses GOOGLE_APPLICATION_CREDENTIALS
-  // on the server, which is the correct way for App Hosting.
+  // This automatically uses GOOGLE_APPLICATION_CREDENTIALS on the server,
+  // which is the correct way for App Hosting and other Google Cloud environments.
   return admin.initializeApp();
 }
 
@@ -29,12 +25,6 @@ const NewEntrySchema = z.object({
   mood: z.enum(['Happy', 'Calm', 'Neutral', 'Sad', 'Anxious']),
   userId: z.string().min(1, 'User ID is required.'),
 });
-
-const DeleteEntrySchema = z.object({
-    entryId: z.string().min(1, 'Entry ID is required.'),
-    userId: z.string().min(1, 'User ID is required.'),
-});
-
 
 // --------------------
 // Journal entry creation
@@ -80,12 +70,6 @@ export async function createJournalEntry(prevState: any, formData: FormData) {
 // Journal entry deletion
 // --------------------
 export async function deleteJournalEntry(userId: string, entryId: string): Promise<{ success: boolean; message?: string }> {
-    const validatedFields = DeleteEntrySchema.safeParse({ userId, entryId });
-
-    if (!validatedFields.success) {
-        return { success: false, message: 'Invalid IDs provided.' };
-    }
-
     try {
         const adminDb = getAdminApp().firestore();
         const entryRef = adminDb.doc(`users/${userId}/journalEntries/${entryId}`);
