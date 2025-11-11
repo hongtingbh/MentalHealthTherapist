@@ -20,7 +20,7 @@ export type JournalEntry = {
 export type ChatMessage = {
   id: string;
   role: 'user' | 'assistant';
-  text: string;
+  text?: string;
   mediaUrl?: string; // for displaying on the client
   mediaMimeType?: string; // for displaying on the client
   classification?: {

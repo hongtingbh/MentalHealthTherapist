@@ -102,20 +102,23 @@ export async function deleteJournalEntry(userId: string, entryId: string): Promi
 export async function postChatMessage(
   userId: string,
   sessionId: string,
-  message: string,
+  message?: string,
   mediaUrl?: string
 ): Promise<void> {
   try {
     const adminDb = getAdminApp().firestore();
     const messagePath = `users/${userId}/sessions/${sessionId}/messages`;
 
-    const userMessageData: { role: 'user'; text: string; mediaUrl?: string; timestamp: FirebaseFirestore.FieldValue; userId: string; } = {
+    const userMessageData: { role: 'user'; text?: string; mediaUrl?: string; timestamp: FirebaseFirestore.FieldValue; userId: string; } = {
       role: 'user',
-      text: message,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       userId,
     };
     
+    if (message) {
+      userMessageData.text = message;
+    }
+
     if (mediaUrl) {
         userMessageData.mediaUrl = mediaUrl;
     }
