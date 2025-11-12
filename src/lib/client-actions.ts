@@ -30,18 +30,24 @@ export async function deleteJournalEntryClient(userId: string, entryId: string) 
  * @param path Optional storage path (e.g. "users/{userId}/uploads")
  * @returns The download URL for the uploaded file
  */
-export async function uploadFileToFirebase(file: File, path: string) {
+
+export async function uploadFileToFirebase(file: File, userId: string) {
   try {
+    console.log("Uploading now");
     const storage = getStorage(getApp());
-    const fileRef = ref(storage, `${path}/${Date.now()}-${file.name}`);
+    const uniqueName = `${crypto.randomUUID()}-${file.name}`;
+    const fileRef = ref(storage, `user_uploads/${userId}/${uniqueName}`);
+
     const snapshot = await uploadBytes(fileRef, file);
     const url = await getDownloadURL(snapshot.ref);
+    console.log("Upload success:", snapshot.ref.fullPath);
+    console.log("URL:", url);
     return { success: true, url, mimeType: file.type };
   } catch (error) {
-    console.error('Upload failed:', error);
+    console.error("Upload failed:", error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }

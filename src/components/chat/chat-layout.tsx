@@ -64,6 +64,7 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
 
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("Uploading now");
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -71,7 +72,7 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
       toast({ title: 'Not logged in', description: 'You must be logged in to chat.' });
       return;
     }
-
+    
     setIsSending(true);
 
     try {
@@ -86,7 +87,7 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
       }
 
       // 2. Call the server action with the file URL
-      await postChatMessage(user.uid, sessionId, uploadResult.url);
+      await postChatMessage(user.uid, sessionId, uploadResult.url!);
 
     } catch (error: any) {
       console.error('Error sending file:', error);
@@ -193,7 +194,9 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
         <div className="flex justify-center items-center h-full">
             <Button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {console.log("Paperclip button clicked");
+
+               fileInputRef.current?.click()}}
               disabled={isSending}
               size="lg"
             >
