@@ -28,6 +28,7 @@ export function LoginForm() {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      toast({ title: "Login successful!", description: "Redirecting to dashboard..." });
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Email login error:', error);

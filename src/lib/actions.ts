@@ -4,27 +4,37 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { JournalEntry, Mood, ChatMessage } from './definitions';
 import admin from 'firebase-admin';
+import { credential } from 'firebase-admin';
+import * as fs from 'fs';
 
 // Helper to get the initialized Firebase Admin App
 function getAdminApp() {
     if (admin.apps.length > 0) {
       return admin.app();
     }
-    
-    // Check if the service account key is available in the environment
-    // This is the standard way ADC works in many environments
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-        return admin.initializeApp({
-            credential: admin.credential.applicationDefault(),
-        });
-    }
 
-    // Fallback for environments where ADC isn't set up automatically
-    // (like some local development setups).
-    // Note: This relies on you setting up a service account and the
-    // GOOGLE_APPLICATION_CREDENTIALS environment variable.
-    console.warn("GOOGLE_APPLICATION_CREDENTIALS environment variable not set. Using default credentials.");
-    return admin.initializeApp();
+    // This is the recommended way to use initializeApp with App Hosting.
+    // It automatically uses Application Default Credentials.
+    try {
+        return admin.initializeApp();
+    } catch (e) {
+        // If the above fails (e.g., in a local environment without ADC setup),
+        // we can fall back to using a service account file.
+        console.warn('Default admin.initializeApp() failed, falling back to service account key. Error:', e);
+        
+        const serviceAccountPath = './service-account.json';
+        if (fs.existsSync(serviceAccountPath)) {
+            return admin.initializeApp({
+                credential: credential.cert(serviceAccountPath),
+            });
+        } else {
+            // This will likely cause subsequent operations to fail, but it prevents an immediate crash.
+            // The errors will be more specific to the Firestore/Auth operation failing.
+            console.error(`Fallback service account file not found at ${serviceAccountPath}. Admin SDK might not work correctly.`);
+            // Continue without full initialization. Firebase services will throw errors when used.
+            return admin.initializeApp({}, 'fallback-app-placeholder'); // Use a named app to avoid conflicts
+        }
+    }
 }
 
 // --------------------
@@ -103,16 +113,18 @@ export async function postChatMessage(
   userId: string,
   sessionId: string,
   mediaUrl: string,
-): Promise<void> {
+  mediaMimeType: string,
+): Promise<{ success: boolean; message?: string } > {
   try {
     const adminDb = getAdminApp().firestore();
     const messagePath = `users/${userId}/sessions/${sessionId}/messages`;
 
-    const userMessageData: { role: 'user'; mediaUrl?: string; timestamp: FirebaseFirestore.FieldValue; userId: string; } = {
-      role: 'user',
+    const userMessageData = {
+      role: 'user' as const,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       userId,
       mediaUrl: mediaUrl,
+      mediaMimeType: mediaMimeType
     };
     
     // Write user message to Firestore
@@ -134,11 +146,12 @@ export async function postChatMessage(
     });
 
     revalidatePath('/chat');
+    return { success: true };
     
   } catch (error) {
     console.error('Error processing chat message:', error);
-    // Re-throw the error to be caught by the client transition
-    throw new Error('Failed to post chat message.');
+    const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+    return { success: false, message };
   }
 }
 
