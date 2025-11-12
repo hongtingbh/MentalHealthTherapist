@@ -28,7 +28,6 @@ export function LoginForm() {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      console.log('Successful login');
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Email login error:', error);
@@ -47,7 +46,6 @@ export function LoginForm() {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-      console.log('Successful login');
       router.push('/dashboard');
     } catch (error) {
       console.error('Google login error:', error);
@@ -98,7 +96,7 @@ export function LoginForm() {
                   type="password" 
                   required 
                   value={password}
-                  onChange={(e) => setPassword(e.targe.value)}
+                  onChange={(e) => setPassword(e.target.value)}
                 />
             </div>
             <Button type="submit" className="w-full" disabled={isLoading || isGoogleLoading}>
