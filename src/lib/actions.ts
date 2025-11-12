@@ -1,3 +1,4 @@
+
 'use server';
 
 import { revalidatePath } from 'next/cache';
@@ -16,23 +17,25 @@ function getAdminApp() {
     // This is the recommended way to use initializeApp with App Hosting.
     // It automatically uses Application Default Credentials.
     try {
+        // Try to initialize using default credentials (works in production)
         return admin.initializeApp();
     } catch (e) {
         // If the above fails (e.g., in a local environment without ADC setup),
         // we can fall back to using a service account file.
-        console.warn('Default admin.initializeApp() failed, falling back to service account key. Error:', e);
+        console.warn('Default admin.initializeApp() failed, trying service account key. Error:', e);
         
         const serviceAccountPath = './service-account.json';
         if (fs.existsSync(serviceAccountPath)) {
+            // Use service account key if it exists (for local development)
             return admin.initializeApp({
                 credential: credential.cert(serviceAccountPath),
             });
         } else {
             // This will likely cause subsequent operations to fail, but it prevents an immediate crash.
-            // The errors will be more specific to the Firestore/Auth operation failing.
-            console.error(`Fallback service account file not found at ${serviceAccountPath}. Admin SDK might not work correctly.`);
-            // Continue without full initialization. Firebase services will throw errors when used.
-            return admin.initializeApp({}, 'fallback-app-placeholder'); // Use a named app to avoid conflicts
+            console.error(`Service account file not found at ${serviceAccountPath}. Admin SDK may not function correctly if default credentials are not available.`);
+            // This is a last resort to prevent crashing the server on startup.
+            // Operations requiring auth will fail later with a more specific error.
+            return admin.initializeApp({}, `fallback-app-${Date.now()}`);
         }
     }
 }
