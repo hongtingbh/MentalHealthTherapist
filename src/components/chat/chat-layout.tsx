@@ -64,7 +64,6 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
 
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    // toast({ title: "Uploading!"});
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -77,22 +76,19 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
 
     try {
       // 1. Upload file to Firebase Storage
-      toast({
-        title: "User ID",
-        description: `Your UID is: ${user.uid}`,
-      });
       const uploadResult = await uploadFileToFirebase(
         file,
-        `${user.uid}`
+        `users/${user.uid}/uploads`
       );
-      toast({ title: "Upload complete", description: uploadResult.url });
-
-      if (!uploadResult.success) {
-        toast({title: "Failed to upload",});
+      
+      if (!uploadResult.success || !uploadResult.url) {
+         throw new Error(uploadResult.message || 'File upload failed.');
       }
 
+      console.log('File uploaded. Access Token URL:', uploadResult.url);
+
       // 2. Call the server action with the file URL
-      await postChatMessage(user.uid, sessionId, uploadResult.url!);
+      await postChatMessage(user.uid, sessionId, uploadResult.url, file.type);
 
     } catch (error: any) {
       console.error('Error sending file:', error);
@@ -199,9 +195,7 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
         <div className="flex justify-center items-center h-full">
             <Button
               type="button"
-              onClick={() => {console.log("Paperclip button clicked");
-
-               fileInputRef.current?.click()}}
+              onClick={() => fileInputRef.current?.click()}
               disabled={isSending}
               size="lg"
             >
