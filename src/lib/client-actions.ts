@@ -33,18 +33,20 @@ export async function deleteJournalEntryClient(userId: string, entryId: string) 
 
 export async function uploadFileToFirebase(file: File, userId: string) {
   try {
-    console.log("attempting")
     const storage = getStorage(getApp());
     const uniqueName = `${crypto.randomUUID()}-${file.name}`;
-    const fileRef = ref(storage, `user_uploads/${userId}/${uniqueName}`);
+    // Correct the path to match storage rules: /users/{userId}/{fileName}
+    const fileRef = ref(storage, `users/${userId}/${uniqueName}`);
 
     const snapshot = await uploadBytes(fileRef, file);
     const url = await getDownloadURL(snapshot.ref);
     return { success: true, url, mimeType: file.type };
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown storage error occurred.";
+    console.error('File upload error:', message);
     return {
       success: false,
-      message: error instanceof Error ? error.message : "Unknown error",
+      message: message,
     };
   }
 }
