@@ -3,6 +3,8 @@
 import { getFirestore, doc, deleteDoc } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { Message } from '@/types/messages';
+import { ChatMessage } from '@/lib/definitions';
 
 
 /**
@@ -36,7 +38,7 @@ export async function uploadFileToFirebase(file: File, userId: string) {
     const storage = getStorage(getApp());
     const uniqueName = `${crypto.randomUUID()}-${file.name}`;
     // Correct the path to match storage rules: /users/{userId}/{fileName}
-    const fileRef = ref(storage, `users/${userId}/${uniqueName}`);
+    const fileRef = ref(storage, `/user_uploads/${userId}/${uniqueName}`);
 
     const snapshot = await uploadBytes(fileRef, file);
     const url = await getDownloadURL(snapshot.ref);
@@ -50,3 +52,33 @@ export async function uploadFileToFirebase(file: File, userId: string) {
     };
   }
 }
+
+export async function sendFileUrlToBackend(session_id: string, user_id: string, video_url: string, past_turns: ChatMessage[], questionnaires: string) {
+    try {
+      const payload = {
+        session_id,
+        user_id,
+        video_url,
+        past_turns,
+        questionnaires,
+      };
+  
+      const response = await fetch("http://127.0.0.1:8000/analyze_turn", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+  
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Backend error: ${errorText}`);
+      }
+  
+      return await response.json();
+    } catch (error) {
+      console.error("Error sending payload:", error);
+      throw error;
+    }
+  }

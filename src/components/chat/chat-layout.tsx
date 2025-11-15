@@ -19,6 +19,7 @@ import Image from 'next/image';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy } from 'firebase/firestore';
 import { uploadFileToFirebase } from '@/lib/client-actions';
+import { sendFileUrlToBackend } from '@/lib/client-actions';
 
 const userAvatar = PlaceHolderImages.find((p) => p.id === 'user-avatar');
 
@@ -36,7 +37,7 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
   const bottomRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
   const firestore = useFirestore();
-
+  
   const messagesQuery = useMemoFirebase(() => {
     if (!user || !firestore || !sessionId) return null;
     return query(
@@ -76,9 +77,7 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
 
     try {
       // 1. Upload file to Firebase Storage
-      const uploadResult = await uploadFileToFirebase(
-        file,
-        `users/${user.uid}/uploads`
+      const uploadResult = await uploadFileToFirebase(file,`${user.uid}`
       );
       
       if (!uploadResult.success || !uploadResult.url) {
@@ -86,9 +85,14 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
       }
 
       console.log('File uploaded. Access Token URL:', uploadResult.url);
+      
+      console.log(messages);
+
+      const aiResponse = await sendFileUrlToBackend(`${user.uid}`,sessionId, uploadResult.url, messages ?? [],"dsada");
+      console.log(aiResponse);
 
       // 2. Call the server action with the file URL
-      await postChatMessage(user.uid, sessionId, uploadResult.url, file.type);
+      postChatMessage(user.uid, sessionId, uploadResult.url);
 
     } catch (error: any) {
       console.error('Error sending file:', error);

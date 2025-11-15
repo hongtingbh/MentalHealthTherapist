@@ -1,6 +1,5 @@
 
 'use server';
-
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { JournalEntry, Mood, ChatMessage } from './definitions';
@@ -10,35 +9,16 @@ import * as fs from 'fs';
 
 // Helper to get the initialized Firebase Admin App
 function getAdminApp() {
-    if (admin.apps.length > 0) {
-      return admin.app();
-    }
-
-    // This is the recommended way to use initializeApp with App Hosting.
-    // It automatically uses Application Default Credentials.
-    try {
-        // Try to initialize using default credentials (works in production)
-        return admin.initializeApp();
-    } catch (e) {
-        // If the above fails (e.g., in a local environment without ADC setup),
-        // we can fall back to using a service account file.
-        console.warn('Default admin.initializeApp() failed, trying service account key. Error:', e);
-        
-        const serviceAccountPath = './service-account.json';
-        if (fs.existsSync(serviceAccountPath)) {
-            // Use service account key if it exists (for local development)
-            return admin.initializeApp({
-                credential: credential.cert(serviceAccountPath),
-            });
-        } else {
-            // This will likely cause subsequent operations to fail, but it prevents an immediate crash.
-            console.error(`Service account file not found at ${serviceAccountPath}. Admin SDK may not function correctly if default credentials are not available.`);
-            // This is a last resort to prevent crashing the server on startup.
-            // Operations requiring auth will fail later with a more specific error.
-            return admin.initializeApp({}, `fallback-app-${Date.now()}`);
-        }
-    }
+  console.log("Admin apps:", admin.apps.length);
+  if (admin.apps.length > 0) {
+    return admin.app();
+  }
+  return admin.initializeApp({
+    credential: admin.credential.applicationDefault(),
+  });
 }
+
+
 
 // --------------------
 // Journal entry schema
@@ -115,19 +95,16 @@ export async function deleteJournalEntry(userId: string, entryId: string): Promi
 export async function postChatMessage(
   userId: string,
   sessionId: string,
-  mediaUrl: string,
-  mediaMimeType: string,
+  video_url: string,
 ): Promise<{ success: boolean; message?: string } > {
   try {
     const adminDb = getAdminApp().firestore();
     const messagePath = `users/${userId}/sessions/${sessionId}/messages`;
-
     const userMessageData = {
       role: 'user' as const,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       userId,
-      mediaUrl: mediaUrl,
-      mediaMimeType: mediaMimeType
+      text: "File uploaded"
     };
     
     // Write user message to Firestore
@@ -137,7 +114,7 @@ export async function postChatMessage(
     const assistantResponse: ChatMessage = {
       role: 'assistant' as const,
       id: new Date().toISOString(),
-      text: "Thank you for sharing. I'm here to listen.",
+      text: "Replace this with AI response.",
     };
 
     // Write assistant message to Firestore
