@@ -121,17 +121,17 @@ export async function deleteJournalEntry(userId: string, entryId: string): Promi
 export async function postChatMessage(
   userId: string,
   sessionId: string,
-  aiResponse: Object
+  // aiResponse: Object
 ): Promise<{ success: boolean; message?: string } > {
   try {
-    //UNPACKING aiResponse object
-    const { assemblyAI_output, bot_reply, deepface_output, diagnostic_mapping } = aiResponse as {
-      assemblyAI_output: { transcript: string, sentiment: string};
-      bot_reply: string;
-      deepface_output:[];
-      diagnostic_mapping:[];
+  //   //UNPACKING aiResponse object
+  //   const { assemblyAI_output, bot_reply, deepface_output, diagnostic_mapping } = aiResponse as {
+  //     assemblyAI_output: { transcript: string, sentiment: string};
+  //     bot_reply: string;
+  //     deepface_output:[];
+  //     diagnostic_mapping:[];
       
-    };
+    // };
 
     // Data about User given by AI
     const adminDb = getAdminApp().firestore();
@@ -140,10 +140,10 @@ export async function postChatMessage(
       role: 'user' as const,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       userId,
-      text: assemblyAI_output.transcript,
-      sentiment: assemblyAI_output.sentiment,
-      emotions: deepface_output,
-      question_scores: diagnostic_mapping
+      text: "assemblyAI_output.transcript",
+      sentiment: "assemblyAI_output.sentiment",
+      emotions: "deepface_output",
+      question_scores: "diagnostic_mapping"
     };
     
     // Write user data to Firestore
@@ -153,7 +153,7 @@ export async function postChatMessage(
     const assistantResponse: ChatMessage = {
       role: 'assistant' as const,
       id: new Date().toISOString(),
-      text: bot_reply
+      text: "bot_reply"
     };
 
     // Write assistant message to Firestore

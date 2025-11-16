@@ -104,17 +104,17 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
       
       console.log(messages);
       const questionnaireJson = await loadQuestionnaireJson();
-      const aiResponse = await sendFileUrlToPythonAPI(`${user.uid}`,sessionId, uploadResult.url, messages ?? [], questionnaireJson ?? '{}');
-      console.log(aiResponse);
+      // const aiResponse = await sendFileUrlToPythonAPI(`${user.uid}`,sessionId, uploadResult.url, messages ?? [], questionnaireJson ?? '{}');
+      // console.log(aiResponse);
 
-      await updateQuestionScores(`${user.uid}`,sessionId, aiResponse.diagnostic_mapping);
+      // await updateQuestionScores(`${user.uid}`,sessionId, aiResponse.diagnostic_mapping);
 
       
 
 
       // 2. Call the server action with the file URL
       
-      await postChatMessage(user.uid, sessionId, aiResponse);
+      await postChatMessage(user.uid, sessionId);
     } catch (error: any) {
       console.error('Error sending file:', error);
       toast({
