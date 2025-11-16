@@ -17,9 +17,10 @@ import { useToast } from '@/hooks/use-toast';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Image from 'next/image';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, doc, getDocs, query, orderBy, setDoc, serverTimestamp } from 'firebase/firestore';
 import { uploadFileToFirebase } from '@/lib/client-actions';
-import { sendFileUrlToBackend } from '@/lib/client-actions';
+import { sendFileUrlToPythonAPI } from '@/lib/client-actions';
+import { updateQuestionScores } from '@/lib/actions';
 
 const userAvatar = PlaceHolderImages.find((p) => p.id === 'user-avatar');
 
@@ -29,7 +30,22 @@ const assistantWelcomeMessage: ChatMessage = {
   text: "Hello! I'm here to listen and support you. Please upload a file to begin.",
 };
 
+
+
+
 export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sessionName: string }) {
+  
+  async function loadQuestionnaireJson() {
+    if (!firestore || !user || !sessionId) return null;
+    const questionsCol = collection(firestore, `users/${user.uid}/sessions/${sessionId}/questions`);
+    const snapshot = await getDocs(questionsCol);
+    const questionnaires: Record<string, any> = {};
+    snapshot.forEach(docSnap => {
+      questionnaires[docSnap.id] = docSnap.data();
+    });
+    return JSON.stringify(questionnaires);
+  }
+
   const [messages, setMessages] = useState<ChatMessage[]>([assistantWelcomeMessage]);
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
@@ -87,13 +103,18 @@ export function ChatLayout({ sessionId, sessionName }: { sessionId: string; sess
       console.log('File uploaded. Access Token URL:', uploadResult.url);
       
       console.log(messages);
-
-      const aiResponse = await sendFileUrlToBackend(`${user.uid}`,sessionId, uploadResult.url, messages ?? [],"dsada");
+      const questionnaireJson = await loadQuestionnaireJson();
+      const aiResponse = await sendFileUrlToPythonAPI(`${user.uid}`,sessionId, uploadResult.url, messages ?? [], questionnaireJson ?? '{}');
       console.log(aiResponse);
 
-      // 2. Call the server action with the file URL
-      postChatMessage(user.uid, sessionId, uploadResult.url);
+      await updateQuestionScores(`${user.uid}`,sessionId, aiResponse.diagnostic_mapping);
 
+      
+
+
+      // 2. Call the server action with the file URL
+      
+      await postChatMessage(user.uid, sessionId, aiResponse);
     } catch (error: any) {
       console.error('Error sending file:', error);
       toast({

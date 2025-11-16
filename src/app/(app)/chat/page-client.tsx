@@ -24,6 +24,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { doc, setDoc } from 'firebase/firestore';
+import { buildQuestionnaireItems } from '@/lib/questionnaireItems';
 
 export default function ChatPageClient({
   deleteChatSession,
@@ -54,6 +56,7 @@ export default function ChatPageClient({
   const handleNewSession = async () => {
     if (!user || !firestore || isCreatingSession.current || !sessionsQuery) return;
     
+    //SESSION CREATION
     isCreatingSession.current = true;
     try {
         const sessionCountSnapshot = await getCountFromServer(sessionsQuery);
@@ -63,6 +66,20 @@ export default function ChatPageClient({
           createdAt: serverTimestamp(),
           name: `Session ${sessionCount + 1}`
         });
+
+        //Add questionnaire_items collection under Sessions document
+        const questionnaireCollection = collection(newSessionRef, 'questions');
+        const questionnaires = buildQuestionnaireItems();
+        
+        //Write questionnaire structure into firestore database
+        for (const [assessmentName, questions] of Object.entries(questionnaires)) {
+          const questionnaireDoc = doc(questionnaireCollection, assessmentName);
+          await setDoc(questionnaireDoc, {
+            createdAt: serverTimestamp(),
+            questions,
+          });
+        }
+
         setActiveSessionId(newSessionRef.id);
     } catch (error) {
         console.error("Failed to create new session:", error);
@@ -239,3 +256,4 @@ export default function ChatPageClient({
     </AlertDialog>
   );
 }
+

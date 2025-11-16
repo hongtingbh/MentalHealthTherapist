@@ -1,11 +1,9 @@
-
 'use server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { JournalEntry, Mood, ChatMessage } from './definitions';
-import admin from 'firebase-admin';
-import { credential } from 'firebase-admin';
-import * as fs from 'fs';
+import admin, { firestore } from 'firebase-admin';
+
 
 // Helper to get the initialized Firebase Admin App
 function getAdminApp() {
@@ -18,8 +16,37 @@ function getAdminApp() {
   });
 }
 
+//Take AI Response and question bank with scores if any
+type DiagnosticMapping = Record<string, Record<string, { score: number }>>;
+export async function updateQuestionScores(
+  userId: string,
+  sessionId: string,
+  mapping: DiagnosticMapping
+) {
+  const adminDb = getAdminApp().firestore();
+  const questionsCollection = adminDb
+    .doc(`users/${userId}/sessions/${sessionId}`)
+    .collection('questions');
 
 
+  for (const [assessmentName, questionMap] of Object.entries(mapping)) {
+    const updates = Object.entries(questionMap).reduce(
+      (acc, [questionId, { score }]) => {
+        acc[questionId] = { score };
+        return acc;
+      },
+      {} as Record<string, { score: number }>
+    );
+
+    await questionsCollection.doc(assessmentName).set(
+      {
+        questions: updates,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  }
+}
 // --------------------
 // Journal entry schema
 // --------------------
@@ -95,26 +122,39 @@ export async function deleteJournalEntry(userId: string, entryId: string): Promi
 export async function postChatMessage(
   userId: string,
   sessionId: string,
-  video_url: string,
+  aiResponse: Object
 ): Promise<{ success: boolean; message?: string } > {
   try {
+    //UNPACKING aiResponse object
+    const { assemblyAI_output, bot_reply, deepface_output, diagnostic_mapping } = aiResponse as {
+      assemblyAI_output: { transcript: string, sentiment: string};
+      bot_reply: string;
+      deepface_output:[];
+      diagnostic_mapping:[];
+      
+    };
+
+    // Data about User given by AI
     const adminDb = getAdminApp().firestore();
     const messagePath = `users/${userId}/sessions/${sessionId}/messages`;
     const userMessageData = {
       role: 'user' as const,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       userId,
-      text: "File uploaded"
+      text: assemblyAI_output.transcript,
+      sentiment: assemblyAI_output.sentiment,
+      emotions: deepface_output,
+      question_scores: diagnostic_mapping
     };
     
-    // Write user message to Firestore
+    // Write user data to Firestore
     await adminDb.collection(messagePath).add(userMessageData);
     
     // Simulate assistant response
     const assistantResponse: ChatMessage = {
       role: 'assistant' as const,
       id: new Date().toISOString(),
-      text: "Replace this with AI response.",
+      text: bot_reply
     };
 
     // Write assistant message to Firestore
