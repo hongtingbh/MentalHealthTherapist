@@ -28,7 +28,6 @@ export async function updateQuestionScores(
     .doc(`users/${userId}/sessions/${sessionId}`)
     .collection('questions');
 
-
   for (const [assessmentName, questionMap] of Object.entries(mapping)) {
     const updates = Object.entries(questionMap).reduce(
       (acc, [questionId, { score }]) => {
