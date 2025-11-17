@@ -4,7 +4,7 @@ Include .env.local in root
 
 Install npm
 1. npm install
-2. Install latest node - visit https://nodejs.org/en or download nvm:
+2. Install latest node v24.11.1 - visit https://nodejs.org/en or download nvm:
     nvm install node
 Run Next.js Server:
 3. npm run dev
@@ -16,6 +16,9 @@ Troubleshooting:
 
 3) "Error saving to database: Cannot read properties of undefined (reading 'prototype')" 
 This issue is caused by running Node v25 or later.
+2 solutions:
+i) Install node v24.11.1
+ii) Patch method
 Go to this file:
 node_modules/buffer-equal-constant-time/index.js (line 37)
 
